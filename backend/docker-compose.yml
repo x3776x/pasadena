@@ -1,0 +1,55 @@
+# backend/docker-compose.yml
+version: '3.8'
+
+services:
+  postgres_db:
+    image: postgres:15-alpine
+    container_name: pasadena_postgres
+    environment:
+      POSTGRES_USER: papu
+      POSTGRES_PASSWORD: CocteauTwins
+      POSTGRES_DB: pasadena_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - pasadena_network
+
+  mongodb:
+    image: mongo:6-jammy
+    container_name: pasadena_mongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: papu
+      MONGO_INITDB_ROOT_PASSWORD: Kavinsky
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - pasadena_network
+
+# auth service
+  auth_service:
+    build: ./auth-service
+    container_name: pasadena_auth_service
+    environment: 
+      - DATABASE_URL=postgresql://papu:CocteauTwins@postgres_db:5432/pasadena_db
+    ports:
+      - "8001:8001"
+    command: >
+      sh -c "alembic upgrade head &&
+         cd /app && python -m app.seed_data &&
+         uvicorn app.main:app --host 0.0.0.0 --port 8001"
+    depends_on:
+      - postgres_db
+    networks:
+      - pasadena_network
+
+volumes:
+  postgres_data:
+  mongo_data:
+
+networks:
+  pasadena_network:
+    driver: bridge
