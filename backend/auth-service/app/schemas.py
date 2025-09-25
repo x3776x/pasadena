@@ -3,7 +3,10 @@ from pydantic import BaseModel, EmailStr
 # Base schema for shared attributes
 class UserBase(BaseModel):
     email: EmailStr
-    full_name: str | None = None
+    full_name: str
+    username: str
+    is_active: bool = True
+    role_id: int = 2
 
 # Schema for creating a user (registration). Includes password.
 class UserCreate(UserBase):
@@ -12,8 +15,6 @@ class UserCreate(UserBase):
 # Schema for what we return to the client.
 class User(UserBase):
     id: int
-    is_active: bool
-    role: str
 
     class Config:
         from_attributes = True  # Allows ORM mode (translates ORM object -> Pydantic model)

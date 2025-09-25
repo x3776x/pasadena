@@ -19,6 +19,7 @@ def authenticate_user(db: Session, email: str, password: str):
     return user
 
 # --- API Endpoints ---
+@app.post("/register", response_model=schemas.User)
 def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
     db_user = user_repository.get_user_by_email(db, user.email)
     if db_user:
@@ -72,5 +73,5 @@ async def get_current_user(
 
 # A simple protected endpoint to test our auth
 @app.get("/users/me", response_model=schemas.User)
-def read_users_me(current_user: schemas.User = Depends(get_current_user)): # We'll build get_current_user next
+def read_users_me(current_user: schemas.User = Depends(get_current_user)):
     return current_user
