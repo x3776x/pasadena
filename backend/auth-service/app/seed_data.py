@@ -5,20 +5,28 @@ def seed_roles():
     db = SessionLocal()
     try:
         # Check if roles already exist
-        if db.query(Role).count() == 0:
-            admin_role = Role(name="administrator")
-            user_role = Role(name="user")
-            db.add(admin_role)
-            db.add(user_role)
+        existing_roles = db.query(Role).filter(Role.name.in_(["user", "administrator"])).all()
+        existing_role_names = [role.name for role in existing_roles]
+
+        roles_to_create = []
+        if "administrator" not in existing_role_names:
+            roles_to_create.append(Role(name="administrator"))
+            
+        if "user" not in existing_role_names:
+            roles_to_create.append(Role(name="user"))
+
+        if roles_to_create:
+            db.add_all(roles_to_create)
             db.commit()
-            print("✅ Successfully seeded initial roles: 'administrator' and 'user'")
+            print(f"✅ Seeded {len(roles_to_create)} new roles")
         else:
-            print("✅ Roles already exist, skipping seeding.")
+            print("✅ All roles already exist, skipping seeding.")
+            
     except Exception as e:
         print(f"❌ Error seeding roles: {e}")
         db.rollback()
     finally:
         db.close()
-
+        
 if __name__ == "__main__":
     seed_roles()
