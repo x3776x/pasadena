@@ -6,6 +6,15 @@ def get_user_by_email(db: Session, email: str):
     """Find a user by their email address."""
     return db.query(models.User).filter(models.User.email == email).first()
 
+def get_user_by_username(db: Session, username: str):
+    """Find a user by their username"""
+    return db.query(models.User).filter(models.User.username == username).first()
+
+
+def get_user_by_id(db: Session, user_id: int):
+    """Find a user by their ID."""
+    return db.query(models.User).filter(models.User.id == user_id).first()
+
 def create_user(db: Session, user: schemas.UserCreate):
     if user.role_id is None:
         user.role_id = 2 
@@ -21,7 +30,3 @@ def create_user(db: Session, user: schemas.UserCreate):
     db.commit()
     db.refresh(db_user) # Refresh to get the ID from the database
     return db_user
-
-def get_user_by_id(db: Session, user_id: int):
-    """Find a user by their ID."""
-    return db.query(models.User).filter(models.User.id == user_id).first()
