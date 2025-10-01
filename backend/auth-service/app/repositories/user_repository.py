@@ -31,3 +31,11 @@ def create_user(db: Session, user: schemas.UserCreate):
     db.commit()
     db.refresh(db_user) # Refresh to get the ID from the database
     return db_user
+
+def update_user_password(db: Session, user_id: int, new_password: str):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if user: 
+        user.hashed_password = get_password_hash(new_password)
+        db.commit()
+        db.refresh(user)
+    return user
