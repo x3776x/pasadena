@@ -5,6 +5,7 @@ from app import schemas
 from app.database import get_db
 from app.dependencies.dependencies import get_current_user, oauth2_scheme
 from app.services.auth_service import AuthService, get_auth_service
+from app.services.password_recovery_service import PasswordRecoveryService, get_password_recovery_service
 
 app = FastAPI(title="Auth Service")
 # --- Authentication helpers ---
@@ -48,3 +49,44 @@ def get_current_user_profile(
 @app.get("/profile-pictures")
 def get_available_profile_pictures():
     return {"available_pictures": [pic.value for pic in schemas.AllowedProfilePics]}
+
+@app.post("/password-recovery/initiate", response_model=schemas.PasswordRecoveryResponse)
+def initiate_password_recovery(
+    request: schemas.PasswordRecoveryRequest,
+    recovery_service: PasswordRecoveryService = Depends(get_password_recovery_service)
+): 
+    try: 
+        return recovery_service.initiate_password_recovery(request)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+
+@app.post("/password-recovery/verify")
+def verify_recovery_code(
+    request: schemas.PasswordRecoveryVerify,
+    recovery_service: PasswordRecoveryService = Depends(get_password_recovery_service)
+):
+    try:
+        recovery_service.verify_recovery_code(request)
+        return {"message:" "Code verified successfully"}
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    
+@app.post("/password-recovery/reset")
+def reset_password(
+    request: schemas.PasswordReset,
+    recovery_service: PasswordRecoveryService = Depends(get_password_recovery_service)
+):
+    try:
+        recovery_service.reset_password(request)
+        return {"message:" "Password reset successfully"}
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )

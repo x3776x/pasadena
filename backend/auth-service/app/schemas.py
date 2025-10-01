@@ -46,3 +46,22 @@ class Token(BaseModel):
 # Schema for the data embedded inside the JWT token
 class TokenData(BaseModel):
     user_id: int | None = None
+
+# Schema for user to modify its password
+class PasswordRecoveryRequest(BaseModel):
+    email: EmailStr
+    username: str
+
+class PasswordRecoveryVerify(BaseModel):
+    email: EmailStr
+    code: str = Field(min_length=4, max_length=4, description="4-digit code")
+
+class PasswordReset(BaseModel):
+    email: EmailStr
+    code: str = Field(min_length=4, max_length=4)
+    new_password: str = Field(min_length=8)
+    confirm_password: str
+
+class PasswordRecoveryResponse(BaseModel):
+    message: str
+    expires_in: int
