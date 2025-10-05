@@ -31,3 +31,4 @@ Thumbs.db
 *.sublime-project
 venv/
 __pycache__/
+/helpers/mailSender.py
