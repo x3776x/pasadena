@@ -7,7 +7,7 @@ from app.dependencies.dependencies import get_current_user, oauth2_scheme
 from app.services.auth_service import AuthService, get_auth_service
 from app.services.password_recovery_service import PasswordRecoveryService, get_password_recovery_service
 
-app = FastAPI(title="Auth Service")
+app = FastAPI(title="Pasadena")
 # --- Authentication helpers ---
 
 app.mount("/static/avatars", StaticFiles(directory="app/static/avatars"), name="static")
