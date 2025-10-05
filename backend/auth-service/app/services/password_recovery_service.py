@@ -1,5 +1,6 @@
 import random
-import secrets
+import redis
+import json
 from datetime import datetime, timedelta
 from fastapi import Depends
 from sqlalchemy.orm import Session
@@ -7,15 +8,31 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.repositories import user_repository
 from app import schemas
+from app.helpers import mailSender
 
-recovery_codes = {} #just to test
+redis_client = redis.Redis(
+     host='redis',
+     port=6379,
+     db=0,
+     decode_responses=True
+)
+
+recovery_codes = {}
 
 class PasswordRecoveryService:
     def __init__(self, db: Session):
         self.db = db
+        self.redis_client = redis_client
 
     def generate_recovery_code(self) -> str:
             return str(random.randint(1000, 9999))
+    
+    def store_recovery_code(self, email: str, code_data: dict):
+         self.redis_client.setex(
+              f"recovery:{email}",
+              300,
+              json.dumps(code_data)
+         )
         
     def initiate_password_recovery(self, request: schemas.PasswordRecoveryRequest
         ) -> schemas.PasswordRecoveryResponse:
@@ -24,54 +41,50 @@ class PasswordRecoveryService:
              raise ValueError("No user found with the provided email and username")
         
         recovery_code = self.generate_recovery_code()
-        expiration = datetime.now() + timedelta(minutes=2)
+        expiration = 120
 
-        recovery_codes[request.email] = {
-             'code': recovery_code,
-             'expires_at': expiration,
-             'verified': False
-        }
+        redis_key = f"recovery:{request.email}"
+        redis_client.hmset(redis_key, {
+             "code": recovery_code,
+             "verified": "0"
+        })
+        redis_client.expire(redis_key, expiration)
 
-        print(f"RECOVERY CODE for {request.email}: {recovery_code}")
+        mailSender.send_recovery_email(request.email, recovery_code)
 
         return schemas.PasswordRecoveryResponse(
              message="Recovery code sent to your email",
              expires_in=2
         )
+    
     def verify_recovery_code(self, request: schemas.PasswordRecoveryVerify) -> bool:
-         if request.email not in recovery_codes:
-              raise ValueError("No code was generated")
-         
-         recovery_data = recovery_codes[request.email]
+         redis_key = f"recovery:{request.email}"
+         data = redis_client.hgetall(redis_key)
 
-         if datetime.now() > recovery_data['expires_at']:
-              del recovery_codes[request.email]
-              raise ValueError("Recovery code has expired")
+         if not data:
+              raise ValueError("No recovery code found or expired")
          
-         if recovery_data['code'] != request.code:
+         if data["code"] != request.code:
               raise ValueError("Invalid recovery code")
          
-         recovery_codes[request.email]['verified'] = True
+         redis_client.hset(redis_key, "verified", "1")
          return True
     
     def reset_password(self, request: schemas.PasswordReset) -> bool:
+         redis_key = f"recovery:{request.email}"
+         data = redis_client.hgetall(redis_key)
+
+         if not data:
+              raise ValueError("No recovery process initiated or expired")
+         
+         if data["verified"] != "1":
+              raise ValueError("Recovery code not verified")
+         
          if request.new_password != request.confirm_password:
               raise ValueError("Passwords do not match")
          
-         if len(request.new_password) < 8:
-              raise ValueError("Password must be at least 8 characters long")
-         
-         if request.email not in recovery_codes:
-              raise ValueError("No recovery process initiated for this email")
-         
-         recovery_data = recovery_codes[request.email]
-
-         if not recovery_data['verified']:
-            raise ValueError("Recovery code not verified")
-         
-         if datetime.now() > recovery_data['expires_at']:
-              del recovery_codes[request.email]
-              raise ValueError("Recovery process has expired")
+         if len(request.new_password) < 8: 
+              raise ValueError("Password must be atleast 8 characters long")
          
          user = user_repository.get_user_by_email(self.db, request.email)
          if not user:
@@ -79,8 +92,7 @@ class PasswordRecoveryService:
          
          user_repository.update_user_password(self.db, user.id, request.new_password)
 
-         del recovery_codes[request.email]
-
+         redis_client.delete(redis_key)
          return True
     
 def get_password_recovery_service(db: Session = Depends(get_db)):
