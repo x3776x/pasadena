@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 import os
 
 # Configuration - Load from environment variables
-SECRET_KEY = os.getenv("SECRET_KEY", "ejemplo_paraProbar_lol")
+SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
