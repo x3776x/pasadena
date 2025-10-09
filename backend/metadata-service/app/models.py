@@ -1,6 +1,10 @@
 from pymongo import MongoClient, ASCENDING
+import os
 
-def get_db(uri="mongodb://mongo:27017/", db_name="pasadena"):
+def get_db(uri=None, db_name="pasadena"):
+    # Si no se pasa URI, tomar la de la variable de entorno o usar la de Docker con auth
+    if not uri:
+        uri = os.getenv("MONGO_URI", "mongodb://papu:Kavinsky@mongodb:27017/pasadena")
     client = MongoClient(uri)
     db = client[db_name]
     return db

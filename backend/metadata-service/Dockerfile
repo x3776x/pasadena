@@ -19,5 +19,6 @@ RUN mkdir -p /data/music
 # Configurar PYTHONPATH para que Python encuentre proto
 ENV PYTHONPATH=/app/app
 
+
 # Ejecutable final
 CMD ["python", "main.py"]

@@ -39,14 +39,15 @@ services:
     depends_on:
       - mongodb
     environment:
-      - MONGO_URI=mongodb://mongo:27017/pasadena
+      - MONGO_URI=mongodb://papu:Kavinsky@mongodb:27017/pasadena?authSource=admin
     ports:
       - "50051:50051"
+    networks:
+      - pasadena_network
+
 
   streaming-service:
-    build:
-      context: ./streaming-service
-      dockerfile: Dockerfile
+    build: ./streaming-service
     container_name: streaming-service
     depends_on:
       - metadata-service

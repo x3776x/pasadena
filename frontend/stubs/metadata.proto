@@ -2,8 +2,6 @@ syntax = "proto3";
 
 package metadata;
 
-
-
 service MetadataService {
   rpc AddSong (AddSongRequest) returns (SongResponse);
   rpc GetSongMetadata (SongRequest) returns (SongResponse);
@@ -11,7 +9,7 @@ service MetadataService {
 }
 
 message AddSongRequest {
-  string file_path = 1;
+  bytes file_data = 1; // Contenido del archivo de audio
 }
 
 message SongRequest {
