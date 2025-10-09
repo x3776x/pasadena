@@ -1,0 +1,6 @@
+grpcio
+grpcio-tools
+pymongo
+mutagen
+alembic
+python-dotenv

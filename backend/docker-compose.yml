@@ -1,5 +1,5 @@
 # backend/docker-compose.yml
-version: '3.8'
+
 
 services:
   postgres_db:
@@ -28,6 +28,30 @@ services:
       - mongo_data:/data/db
     networks:
       - pasadena_network
+
+
+
+  metadata-service:
+    build:
+      context: ./metadata-service
+      dockerfile: Dockerfile
+    container_name: metadata-service
+    depends_on:
+      - mongodb
+    environment:
+      - MONGO_URI=mongodb://mongo:27017/pasadena
+    ports:
+      - "50051:50051"
+
+  streaming-service:
+    build:
+      context: ./streaming-service
+      dockerfile: Dockerfile
+    container_name: streaming-service
+    depends_on:
+      - metadata-service
+    ports:
+      - "50052:50052"
 
 # auth service
   auth_service:
@@ -59,10 +83,17 @@ services:
     networks:
       - pasadena_network
 
+
+
+
+
 volumes:
   postgres_data:
   mongo_data:
-  redis_data: 
+  redis_data:
+
+
+
 
 networks:
   pasadena_network:

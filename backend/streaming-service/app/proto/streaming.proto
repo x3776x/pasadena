@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package streaming;
+
+option go_package = "pasadena/backend/streaming-service/app/proto;proto";
+
+service StreamingService {
+  rpc StreamSong(SongRequest) returns (stream AudioChunk);
+}
+
+message SongRequest {
+  string song_id = 1;
+}
+
+message AudioChunk {
+  bytes data = 1;
+}

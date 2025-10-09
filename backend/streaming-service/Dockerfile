@@ -1,17 +1,29 @@
-# streaming-service/Dockerfile
-FROM python:3.11-slim
+FROM golang:1.25-alpine
 
-# Crear directorio de trabajo
+# Instalar protoc, git y bash
+RUN apk add --no-cache protobuf git bash
+
 WORKDIR /app
 
-# Copiar requirements y código
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copiar módulos de Go y descargar dependencias
+COPY go.mod .
+COPY go.sum .
+RUN go mod download
 
-COPY app/ ./app
+# Instalar plugins gRPC Go
+RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.32 \
+    && go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.3
 
-# Puerto donde corre FastAPI
-EXPOSE 8003
+# Asegurar que $GOPATH/bin esté en PATH
+ENV PATH="$PATH:$(go env GOPATH)/bin"
 
-# Comando para iniciar el servicio
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8003"]
+# Copiar app (incluyendo proto)
+COPY ./app ./app
+
+WORKDIR /app/app
+
+# Generación de stubs gRPC Go desde proto
+RUN protoc --go_out=. --go-grpc_out=. proto/streaming.proto
+
+# Ejecutable final
+CMD ["go", "run", "main.go"]
