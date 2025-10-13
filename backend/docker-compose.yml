@@ -8,13 +8,18 @@ services:
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_DB=pasadena_db
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - pasadena_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h ${POSTGRES_HOST} -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   mongodb:
     image: mongo:6-jammy
@@ -38,22 +43,24 @@ services:
     env_file:
       - .env
     environment: 
-      - DATABASE_URL=postgresql:/${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres_db:5432/${POSTGRES_DB}
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:5432/${POSTGRES_DB}
       - REDIS_URL=redis://redis:6379/0
       - SECRET_KEY=${SECRET_KEY}
       - MAIL_ADDRESS=${MAIL_ADDRESS}
       - MAIL_PASS=${MAIL_PASS}
     ports:
       - "8001:8001"
-    command: >
-      sh -c "alembic upgrade head &&
-         cd /app && python -m app.seed_data &&
-         uvicorn app.main:app --host 0.0.0.0 --port 8001"
+    command: ["/bin/sh", "/app/entrypoint.sh"]
     depends_on:
       - postgres_db
       - redis
     networks:
       - pasadena_network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
 # Redis to send codes
   redis:
@@ -63,6 +70,31 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    networks:
+      - pasadena_network
+
+# playlists service
+  playlist_service:
+    build: ./playlist-service
+    container_name: pasadena_playlist_service
+    environment:
+      - DATABASE_URL=postgresql://papu:CocteauTwins@postgres_db:5432/pasadena_db
+    ports:
+      - "8002:8002"
+    command: >
+      sh -c "
+        until pg_isready -h postgres_db -U papu; do
+          echo 'Esperando a PostgreSQL...';
+          sleep 2;
+        done;
+        until curl -s http://auth_service:8001/health; do
+          echo 'Esperando a auth_service...';
+          sleep 2;
+        done;
+        uvicorn app.main:app --host 0.0.0.0 --port 8002"
+    depends_on:
+      - postgres_db
+      - auth_service
     networks:
       - pasadena_network
 

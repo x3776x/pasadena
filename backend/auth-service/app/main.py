@@ -90,3 +90,16 @@ def reset_password(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
+    
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
+
+@app.get("/verify-token")
+def verify_token(current_user: schemas.User = Depends(get_current_user)):
+    """
+    Endpoint para que otros servicios (ej. playlist-service) verifiquen un token.
+    Retorna info del usuario si el token es válido.
+    """
+    return current_user
