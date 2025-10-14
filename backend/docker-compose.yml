@@ -5,23 +5,32 @@ services:
   postgres_db:
     image: postgres:15-alpine
     container_name: pasadena_postgres
+    env_file:
+      - .env
     environment:
-      POSTGRES_USER: papu
-      POSTGRES_PASSWORD: CocteauTwins
-      POSTGRES_DB: pasadena_db
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
       - pasadena_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h ${POSTGRES_HOST} -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   mongodb:
     image: mongo:6-jammy
     container_name: pasadena_mongo
+    env_file:
+      - .env
     environment:
-      MONGO_INITDB_ROOT_USERNAME: papu
-      MONGO_INITDB_ROOT_PASSWORD: Kavinsky
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
     ports:
       - "27017:27017"
     volumes:
@@ -58,20 +67,27 @@ services:
   auth_service:
     build: ./auth-service
     container_name: pasadena_auth_service
-    environment: 
-      - DATABASE_URL=postgresql://papu:CocteauTwins@postgres_db:5432/pasadena_db
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:5432/${POSTGRES_DB}
       - REDIS_URL=redis://redis:6379/0
+      - SECRET_KEY=${SECRET_KEY}
+      - MAIL_ADDRESS=${MAIL_ADDRESS}
+      - MAIL_PASS=${MAIL_PASS}
     ports:
       - "8001:8001"
-    command: >
-      sh -c "alembic upgrade head &&
-         cd /app && python -m app.seed_data &&
-         uvicorn app.main:app --host 0.0.0.0 --port 8001"
+    command: ["/bin/sh", "/app/entrypoint.sh"]
     depends_on:
       - postgres_db
       - redis
     networks:
       - pasadena_network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
 # Redis to send codes
   redis:
@@ -84,9 +100,49 @@ services:
     networks:
       - pasadena_network
 
+  postgres_playlist_db:
+    image: postgres:15-alpine
+    container_name: playlist_postgres
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_PLAYLIST_DB}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_playlist_data:/var/lib/postgresql/data
+    networks:
+      - pasadena_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h ${POSTGRES_PLAYLIST_HOST} -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
-
-
+# playlists service
+  playlist_service:
+    build: ./playlist-service
+    container_name: pasadena_playlist_service
+    environment:
+      - DATABASE_URL=postgresql://papu:CocteauTwins@postgres_playlist_db:5432/pasadena_playlist_db
+    ports:
+      - "8002:8002"
+    command: >
+      sh -c "
+        until pg_isready -h postgres_playlist_db -U papu; do
+          echo 'Esperando a PostgreSQL...';
+          sleep 2;
+        done;
+        echo 'Base de datos lista. Ejecutando migraciones...';
+        alembic upgrade head;
+        echo 'Migraciones completadas. Iniciando servidor...';
+        uvicorn app.main:app --host 0.0.0.0 --port 8002"
+    depends_on:
+      - postgres_playlist_db
+    networks:
+      - pasadena_network
 
 volumes:
   postgres_data:
