@@ -8,7 +8,7 @@ services:
     environment:
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=pasadena_db
+      - POSTGRES_DB=${POSTGRES_DB}
     ports:
       - "5432:5432"
     volumes:
@@ -73,33 +73,53 @@ services:
     networks:
       - pasadena_network
 
+  postgres_playlist_db:
+    image: postgres:15-alpine
+    container_name: playlist_postgres
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_PLAYLIST_DB}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_playlist_data:/var/lib/postgresql/data
+    networks:
+      - pasadena_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h ${POSTGRES_PLAYLIST_HOST} -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
 # playlists service
   playlist_service:
     build: ./playlist-service
     container_name: pasadena_playlist_service
     environment:
-      - DATABASE_URL=postgresql://papu:CocteauTwins@postgres_db:5432/pasadena_db
+      - DATABASE_URL=postgresql://papu:CocteauTwins@postgres_playlist_db:5432/pasadena_playlist_db
     ports:
       - "8002:8002"
     command: >
       sh -c "
-        until pg_isready -h postgres_db -U papu; do
+        until pg_isready -h postgres_playlist_db -U papu; do
           echo 'Esperando a PostgreSQL...';
           sleep 2;
         done;
-        until curl -s http://auth_service:8001/health; do
-          echo 'Esperando a auth_service...';
-          sleep 2;
-        done;
+        echo 'Base de datos lista. Ejecutando migraciones...';
+        alembic upgrade head;
+        echo 'Migraciones completadas. Iniciando servidor...';
         uvicorn app.main:app --host 0.0.0.0 --port 8002"
     depends_on:
-      - postgres_db
-      - auth_service
+      - postgres_playlist_db
     networks:
       - pasadena_network
 
 volumes:
   postgres_data:
+  postgres_playlist_data:
   mongo_data:
   redis_data: 
 
