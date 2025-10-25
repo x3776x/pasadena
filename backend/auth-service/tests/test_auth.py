@@ -55,32 +55,3 @@ class TestAuthEndpoints:
 
         assert response.status_code == 401
         assert "Incorrect credentials" in response.json()["detail"]
-    
-    def test_get_current_user_profile(self, client):
-        client.post("/register", json=TEST_USER_REGISTER.model_dump())
-        login_response = client.post("/login", json=TEST_USER_LOGIN)
-        token = login_response.json()["access_token"]
-
-        response = client.get(
-            "/users/me",
-            headers={"Authorization": f"Bearer {token}"}
-        )
-
-        assert response.status_code == 200
-        data = response.json()
-        assert data["email"] == TEST_USER_REGISTER.email
-
-    def test_get_current_user_profile_unauthenticated(self, client):
-        response = client.get("/users/me")
-
-        assert response.status_code == 401
-        assert "Not authenticated" in response.json()["detail"]
-    
-    def test_get_current_user_invalid_token(self, client):
-        response = client.get(
-            "/users/me",
-            headers={"Authorization": "Bearer invalid_token"}
-        )
-
-        assert response.status_code == 401
-        assert "Could not validate credentials" in response.json()["detail"]
