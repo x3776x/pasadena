@@ -10,8 +10,6 @@ from app.services.password_recovery_service import PasswordRecoveryService, get_
 app = FastAPI(title="Pasadena")
 # --- Authentication helpers ---
 
-app.mount("/static/avatars", StaticFiles(directory="app/static/avatars"), name="static")
-
 # --- API Endpoints ---
 @app.post("/register", response_model=schemas.User)
 def register(
@@ -39,16 +37,6 @@ def login(
             detail=str(e),
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
-@app.get("/users/me", response_model=schemas.User)
-def get_current_user_profile(
-    current_user: schemas.User = Depends(get_current_user)
-):
-    return current_user
-
-@app.get("/profile-pictures")
-def get_available_profile_pictures():
-    return {"available_pictures": [pic.value for pic in schemas.AllowedProfilePics]}
 
 @app.post("/password-recovery/initiate", response_model=schemas.PasswordRecoveryResponse)
 def initiate_password_recovery(
@@ -90,11 +78,6 @@ def reset_password(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
-    
-
-@app.get("/health")
-def health_check():
-    return {"status": "ok"}
 
 @app.get("/verify-token")
 def verify_token(current_user: schemas.User = Depends(get_current_user)):

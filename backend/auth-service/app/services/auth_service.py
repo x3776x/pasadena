@@ -7,8 +7,6 @@ from app import schemas, security
 from app.database import get_db
 from app.repositories import user_repository
 
-ALLOWED_PROFILE_PICS = {pic.value for pic in schemas.AllowedProfilePics}
-
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 
 class AuthService:
