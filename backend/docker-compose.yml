@@ -126,7 +126,7 @@ services:
     build: ./playlist-service
     container_name: pasadena_playlist_service
     environment:
-      - DATABASE_URL=postgresql://papu:CocteauTwins@postgres_playlist_db:5432/pasadena_playlist_db
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres_playlist_db:5432/${POSTGRES_PLAYLIST_DB}
     ports:
       - "8002:8002"
     command: >
