@@ -6,8 +6,10 @@ from sqlalchemy.orm import Session
 from app import schemas, security
 from app.database import get_db
 from app.repositories import user_repository
+import httpx
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+USER_SERVICE_URL = "http://user-service:8003/users"
 
 class AuthService:
     def __init__(self, db: Session):
@@ -22,6 +24,24 @@ class AuthService:
         
         if len(user_data.password) < 8:
             raise ValueError("Password must be at least 8 characters long")
+        
+        db_user = user_repository.create_user(self.db, user_data)
+
+        payload = {
+            "id": db_user.id,
+            "username": db_user.username,
+            "email": db_user.email,
+            "full_name": db_user.full_name,
+            "avatar": "avatar1.png"
+        }
+
+        try: 
+            with httpx.Client() as client:
+                response = client.post(USER_SERVICE_URL, json=payload, timeout=5)
+                response.raise_for_status()
+        except httpx.RequestError as e:
+            user_repository.delete_user(self.db, db_user.id)
+            raise ConnectionError("Failed to communicate with user service") from e
         
         return user_repository.create_user(self.db, user_data)
     

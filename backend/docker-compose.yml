@@ -82,6 +82,46 @@ services:
     networks:
       - pasadena_network
 
+# user MongoDB
+  mongo_user_db:
+    image: mongo:6-jammy
+    container_name: user_mongo
+    env_file:
+      - .env
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
+      - MONGO_INITDB_DATABASE=${MONGO_USER_DB}
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongo_user_data:/data/db
+    networks: 
+      - pasadena_network
+    healthcheck:
+      test: mongosh --username ${MONGO_INITDB_ROOT_USERNAME} --password ${MONGO_INITDB_ROOT_PASSWORD} --eval "db.adminCommand('ping')"
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+# user service
+  user_service:
+    build: ./user-service
+    container_name: pasadena_user_service
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongo_user_db:27017/${MONGO_USER_DB}?authSource=admin
+    ports:
+      - "8003:8003"
+    command: "uvicorn app.main:app --host 0.0.0.0 --port 8003"
+    depends_on:
+      mongo_user_db:
+        condition: service_healthy
+    networks:
+      - pasadena_network
+
 # Playlist Postgres DB
   postgres_playlist_db:
     image: postgres:15-alpine
@@ -144,6 +184,7 @@ volumes:
   postgres_playlist_data:
   mongo_data:
   redis_data: 
+  mongo_user_data:
 
 networks:
   pasadena_network:
