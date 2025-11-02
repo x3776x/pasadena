@@ -43,7 +43,7 @@ class AuthService:
             user_repository.delete_user(self.db, db_user.id)
             raise ConnectionError("Failed to communicate with user service") from e
         
-        return user_repository.create_user(self.db, user_data)
+        return db_user
     
     def login_user(self, identifier: str, password: str) -> schemas.Token:
         user = user_repository.get_user_by_email(self.db, identifier)

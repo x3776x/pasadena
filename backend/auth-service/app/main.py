@@ -6,6 +6,7 @@ from app.database import get_db
 from app.dependencies.dependencies import get_current_user, oauth2_scheme
 from app.services.auth_service import AuthService, get_auth_service
 from app.services.password_recovery_service import PasswordRecoveryService, get_password_recovery_service
+from sqlalchemy.exc import IntegrityError
 
 app = FastAPI(title="Pasadena")
 # --- Authentication helpers ---
@@ -20,8 +21,13 @@ def register(
         return auth_service.register_user(user)
     except ValueError as e:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Service Unavailable, please try again later"
         )
     
 @app.post("/login", response_model=schemas.Token)
@@ -86,3 +92,7 @@ def verify_token(current_user: schemas.User = Depends(get_current_user)):
     Retorna info del usuario si el token es válido.
     """
     return current_user
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}

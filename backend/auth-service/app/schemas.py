@@ -12,11 +12,11 @@ class UserBase(BaseModel):
 
 class UserLogin(BaseModel):
     identifier: str
-    password: str = Field(format="password")
+    password: str = Field(min_length=8)
 
 # Schema for creating a user (registration). Includes password.
 class UserCreate(UserBase):
-    password: str = Field(format="password")
+    password: str = Field(min_length=8)
 
 # Schema for what we return to the client.
 class User(UserBase):
