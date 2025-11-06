@@ -6,39 +6,70 @@ from sqlalchemy.orm import Session
 from app import schemas, security
 from app.database import get_db
 from app.repositories import user_repository
+import httpx
+import os
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
+USER_SERVICE_URL = os.getenv("USER_SERVICE_URL", "http://user_service:8003/profiles")
 
 class AuthService:
     def __init__(self, db: Session):
         self.db = db
 
     def register_user(self, user_data: schemas.UserCreate) -> schemas.User:
-        if user_repository.get_user_by_email(self.db, user_data.email):
-            raise ValueError("Email already registered")
-        
-        if user_repository.get_user_by_username(self.db, user_data.username):
-            raise ValueError("Username already taken")
-        
-        if len(user_data.password) < 8:
-            raise ValueError("Password must be at least 8 characters long")
-        
-        return user_repository.create_user(self.db, user_data)
+        try:
+            user_data.email = user_data.email.lower().strip()
+            user_data.username = user_data.username.strip()
+
+            if user_repository.get_user_by_email(self.db, user_data.email):
+                raise ValueError("Email already registered")
+            
+            if user_repository.get_user_by_username(self.db, user_data.username):
+                raise ValueError("Username already taken")
+            
+            if not security.validate_password_complexity(user_data.password):
+                raise ValueError('Password must contain uppercase, lowercase and numbers')
+            
+            db_user = user_repository.create_user(self.db, user_data)
+
+            payload = {
+                "user_id": db_user.id,
+                "profile_picture": "avatar1.png"
+            }
+
+            try: 
+                with httpx.Client() as client:
+                    response = client.post(USER_SERVICE_URL, json=payload, timeout=5)
+                    response.raise_for_status()
+            except httpx.RequestError as e:
+                user_repository.delete_user(self.db, db_user.id)
+                raise ConnectionError("Failed to communicate with user service") from e
+            
+            return db_user
+        except (ValueError, ConnectionError) as e:
+            raise e
+        except Exception as e:
+            raise Exception("Registration service unavailable - please try again later")
     
     def login_user(self, identifier: str, password: str) -> schemas.Token:
-        user = user_repository.get_user_by_email(self.db, identifier)
-        if not user:
-            user = user_repository.get_user_by_username(self.db, identifier)
+        try:
+            user = user_repository.get_user_by_email(self.db, identifier)
+            if not user:
+                user = user_repository.get_user_by_username(self.db, identifier)
 
-        if not user or not security.verify_password(password, user.hashed_password):
-            raise ValueError("Incorrect credentials")
-        access_token_expires = timedelta(minutes=security.ACCESS_TOKEN_EXPIRE_MINUTES)
-        access_token = security.create_access_token(
-            data={"sub": str(user.id)},
-            expires_delta=access_token_expires
-        )
+            if not user or not security.verify_password(password, user.hashed_password):
+                raise ValueError("Incorrect credentials")
+            access_token_expires = timedelta(minutes=security.ACCESS_TOKEN_EXPIRE_MINUTES)
+            access_token = security.create_access_token(
+                data={"sub": str(user.id)},
+                expires_delta=access_token_expires
+            )
 
-        return schemas.Token(access_token=access_token, token_type="bearer")
+            return schemas.Token(access_token=access_token, token_type="bearer")
+        except ValueError as e:
+            raise e
+        except Exception as e:
+            raise Exception("Login service unavailable - please try again later")
     
     def get_user_by_id(self, user_id: int) -> schemas.User:
         user = user_repository.get_user_by_id(self.db, user_id)

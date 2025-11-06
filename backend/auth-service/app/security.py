@@ -29,3 +29,16 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
+
+def validate_password_complexity(password: str) -> bool:
+    """Check password meets complexity requirements"""
+    if (len(password) >= 8 and 
+        any(c.isupper() for c in password) and 
+        any(c.islower() for c in password) and 
+        any(c.isdigit() for c in password)):
+        return True
+    return False
+
+def sanitize_input(input_string: str) -> str:
+    """Basic input sanitization"""
+    return re.sub(r'[<>&\"\']', '', input_string).strip()
