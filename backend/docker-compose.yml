@@ -48,6 +48,7 @@ services:
       - SECRET_KEY=${SECRET_KEY}
       - MAIL_ADDRESS=${MAIL_ADDRESS}
       - MAIL_PASS=${MAIL_PASS}
+      - USER_SERVICE_URL=http://user_service:8003/profiles
     ports:
       - "8001:8001"
     command: >
@@ -63,6 +64,7 @@ services:
     depends_on:
       - postgres_auth_db
       - redis
+      - user_service
     networks:
       - pasadena_network
     healthcheck:
@@ -176,6 +178,7 @@ services:
     depends_on:
       - auth_service
       - playlist_service
+      - user_service
     networks:
       - pasadena_network
 

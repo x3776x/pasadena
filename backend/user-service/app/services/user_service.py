@@ -5,15 +5,19 @@ class UserService:
     def __init__(self):
         self.repository = UserRepository()
 
-    def get_profile(self, user_id: int, profile_data: schemas.UserProfileCreate):
-        existing_profile = self.repository.get_user_profile(user_id)
+    def create_profile(self, profile_data: schemas.UserProfileCreate):
+        existing_profile = self.repository.get_user_profile(profile_data.user_id)
         if existing_profile:
             raise ValueError("User profile already exists")
-        
-        profile_dic = profile_data.dic()
-        profile_dic["user_id"] = user_id
 
-        return self.repository.create_user_profile(profile_dic)
+        profile_dict = profile_data.model_dump()
+        return self.repository.create_user_profile(profile_dict)
+
+    def get_profile(self, user_id: int):
+        profile = self.repository.get_user_profile(user_id)
+        if not profile:
+            raise ValueError("User profile not found")
+        return profile
     
     def update_profile(self, user_id: int, update_data: schemas.UserProfileUpdate):
         existing_profile = self.repository.get_user_profile(user_id)

@@ -34,15 +34,15 @@ def create_user_profile(
     profile_data: schemas.UserProfileCreate,
     user_service: UserService = Depends(get_user_service)
 ):
-    try:
-        profile_id = user_service.create_profile(profile_data.user_id, profile_data)
+    try: 
+        profile_id = user_service.create_profile(profile_data)
         return {"message": "Profile created successfully", "profile_id": profile_id}
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
-    
+
 @app.put("/profiles/{user_id}", response_model=dict)
 def update_user_profile(
     user_id: int,
@@ -84,3 +84,7 @@ def update_profile_picture(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
+    
+@app.get("/health")
+def health_check():
+    return {"status": "OK"}

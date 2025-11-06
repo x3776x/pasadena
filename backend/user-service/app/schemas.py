@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
 from typing import Optional
 from enum import Enum
+from datetime import datetime
 
 class AllowedProfilePictures(str, Enum):
     AVATAR1 = "avatar1.png"
@@ -15,18 +16,18 @@ class AllowedProfilePictures(str, Enum):
     AVATAR10 = "avatar10.png"
 
 class UserProfileBase(BaseModel):
-    profile_pciture: AllowedProfilePictures = AllowedProfilePictures.AVATAR1
+    profile_picture: AllowedProfilePictures = AllowedProfilePictures.AVATAR1
 
 class UserProfileCreate(UserProfileBase):
     user_id: int
 
 class UserProfileUpdate(BaseModel):
-    profile_pciture: Optional[AllowedProfilePictures] = None
+    profile_picture: Optional[AllowedProfilePictures] = None
 
 class UserProfileResponse(UserProfileBase):
     user_id: int 
-    created_at: str
-    updated_at: str
+    created_at: datetime
+    updated_at: datetime
 
     class Config:
         from_attributes = True
