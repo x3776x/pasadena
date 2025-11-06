@@ -1,13 +1,12 @@
 import random
 import redis
 import json
-from datetime import datetime, timedelta
 from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.repositories import user_repository
-from app import schemas
+from app import schemas, security
 from app.helpers import mailSender
 
 redis_client = redis.Redis(
@@ -83,8 +82,8 @@ class PasswordRecoveryService:
          if request.new_password != request.confirm_password:
               raise ValueError("Passwords do not match")
          
-         if len(request.new_password) < 8: 
-              raise ValueError("Password must be atleast 8 characters long")
+         if not security.validate_password_complexity(request.new_password):
+              raise ValueError("Password must contain uppercase, lowercase and numbers")
          
          user = user_repository.get_user_by_email(self.db, request.email)
          if not user:

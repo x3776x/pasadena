@@ -40,6 +40,38 @@ class TestAuthEndpoints:
         assert "already registered" in response.json()["detail"]
 
     @patch('app.services.auth_service.httpx.Client')
+    def test_register_user_invalid_email(self, mock_httpx, client):
+        test_user = create_test_user_register()
+        test_user.email = 'simpleexample.com'
+
+        mock_response = MagicMock()
+        mock_response.raise_for_status.return_value = None
+        mock_httpx.return_value.__enter__.return_value.post.return_value = mock_response
+
+        response = client.post("/register", json=test_user.model_dump())
+
+        assert response.status_code == 422
+        error_detail = response.json()["detail"][0]
+        assert "email" in error_detail["loc"]
+        assert "valid email" in error_detail["msg"].lower()
+
+    @patch('app.services.auth_service.httpx.Client')
+    def test_register_user_invalid_password(self, mock_httpx, client):
+        test_user = create_test_user_register()
+        test_user.password = 'smpass'
+
+        mock_response = MagicMock()
+        mock_response.raise_for_status.return_value = None
+        mock_httpx.return_value.__enter__.return_value.post.return_value = mock_response
+
+        response = client.post("/register", json=test_user.model_dump())
+
+        assert response.status_code == 422
+        error_detail = response.json()["detail"][0]
+        assert "password" in error_detail["loc"]
+        assert "at least 8" in error_detail["msg"].lower()
+
+    @patch('app.services.auth_service.httpx.Client')
     def test_server_crash(self, mock_httpx, client):
         mock_httpx.return_value.__enter__.return_value.post.side_effect = Exception("Try again later")
 
