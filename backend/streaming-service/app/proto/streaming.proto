@@ -1,17 +1,16 @@
 syntax = "proto3";
 
 package streaming;
-
-option go_package = "pasadena/backend/streaming-service/app/proto;proto";
+option go_package = "app/proto";
 
 service StreamingService {
-  rpc StreamSong(SongRequest) returns (stream AudioChunk);
+  rpc StreamSong (StreamRequest) returns (stream StreamResponse);
 }
 
-message SongRequest {
-  string song_id = 1;
+message StreamRequest {
+  string song_id = 1; // ID de la canción (el mismo que devuelve metadata-service)
 }
 
-message AudioChunk {
-  bytes data = 1;
+message StreamResponse {
+  bytes chunk = 1;    // Fragmento del archivo de audio
 }

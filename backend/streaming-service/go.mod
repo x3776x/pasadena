@@ -1,4 +1,6 @@
-module pasadena/backend/streaming-service/app
+module app
+
+
 
 go 1.25
 

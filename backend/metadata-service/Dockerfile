@@ -1,24 +1,31 @@
 FROM python:3.11-slim
 
+# Establecer directorio de trabajo
 WORKDIR /app
 
-# Instalar dependencias
+# Copiar dependencias
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
 
-# Copiar toda la app, incluyendo proto
+# Instalar dependencias del proyecto y grpcio-tools
+RUN pip install --no-cache-dir -r requirements.txt grpcio-tools alembic
+
+# Copiar todo el código (incluye proto, models, services, etc.)
 COPY ./app ./app
 
+# Entrar a la carpeta app
 WORKDIR /app/app
-
-# Hacer que proto sea un paquete Python
 
 # Crear carpeta para archivos de música
 RUN mkdir -p /data/music
 
-# Configurar PYTHONPATH para que Python encuentre proto
+# Compilar automáticamente los archivos .proto
+RUN python -m grpc_tools.protoc \
+    -I. \
+    --python_out=. \
+    --grpc_python_out=. \
+    ./proto/*.proto
+# Configurar PYTHONPATH para que Python encuentre los módulos generados
 ENV PYTHONPATH=/app/app
 
-
-# Ejecutable final
-CMD ["python", "main.py"]
+# Ejecutar migraciones (solo si existen) y luego iniciar el servicio
+CMD sh -c "if [ -d alembic ]; then alembic upgrade head; else echo 'No migrations found'; fi && python main.py"

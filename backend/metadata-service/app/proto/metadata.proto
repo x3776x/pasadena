@@ -6,10 +6,18 @@ service MetadataService {
   rpc AddSong (AddSongRequest) returns (SongResponse);
   rpc GetSongMetadata (SongRequest) returns (SongResponse);
   rpc GetSongPath (SongRequest) returns (SongPathResponse);
+  rpc DeleteSong (SongRequest) returns (DeleteResponse); // ← opcional
 }
 
 message AddSongRequest {
-  bytes file_data = 1; // Contenido del archivo de audio
+  bytes file_data = 1;
+  string title = 2;
+  string artist = 3;
+  string album = 4;
+  string year = 5;
+  string genre = 6;
+  double duration = 7;
+  bytes album_cover = 8;
 }
 
 message SongRequest {
@@ -29,4 +37,9 @@ message SongResponse {
 
 message SongPathResponse {
   string path = 1;
+}
+
+message DeleteResponse {
+  bool success = 1;
+  string message = 2;
 }
