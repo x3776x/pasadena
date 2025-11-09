@@ -22,3 +22,21 @@ class Playlist(PlaylistBase):
 
     class Config:
         from_attributes = True
+
+# === PLAYLIST SONGS ===
+
+class PlaylistSongBase(BaseModel):
+    song_id: int
+    position: int
+
+class PlaylistSongCreate(PlaylistSongBase):
+    pass
+
+class PlaylistSongUpdate(BaseModel):
+    position: int
+
+class PlaylistSong(PlaylistSongBase):
+    playlist_id: int
+
+    class Config:
+        from_attributes = True

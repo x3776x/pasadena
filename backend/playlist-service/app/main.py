@@ -94,3 +94,82 @@ def get_all_playlists(
     """Obtiene todas las playlists, activas e inactivas."""
     return playlist_service.get_all_playlists()
 
+
+# === PLAYLIST SONGS ===
+
+@app.post("/playlist/{playlist_id}/songs")
+def add_song_to_playlist(
+    playlist_id: int,
+    song: playlist_schemas.PlaylistSongCreate,  # schema con song_id y position
+    current_user = Depends(get_current_user),
+    playlist_service: PlaylistService = Depends(get_playlist_service)
+):
+    pl = get_playlist_by_id(playlist_service.db, playlist_id)
+    if pl is None or pl.owner_id != current_user["id"]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
+    try:
+        return playlist_service.add_song_to_playlist(playlist_id, song.song_id, song.position)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+
+
+@app.delete("/playlist/{playlist_id}/songs/{song_id}")
+def remove_song_from_playlist(
+    playlist_id: int,
+    song_id: int,
+    current_user = Depends(get_current_user),
+    playlist_service: PlaylistService = Depends(get_playlist_service)
+):
+    pl = get_playlist_by_id(playlist_service.db, playlist_id)
+    if pl is None or pl.owner_id != current_user["id"]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
+    try:
+        playlist_service.remove_song_from_playlist(playlist_id, song_id)
+        return {"message": "song removed"}
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@app.get("/playlist/{playlist_id}/songs", response_model=list[playlist_schemas.PlaylistSong])
+def get_songs_in_playlist(
+    playlist_id: int,
+    playlist_service: PlaylistService = Depends(get_playlist_service)
+):
+    """
+    Devuelve todas las canciones de una playlist ordenadas por posición.
+    """
+    return playlist_service.get_songs_in_playlist(playlist_id)
+
+
+@app.put("/playlist/{playlist_id}/songs/{song_id}")
+def update_song_position(
+    playlist_id: int,
+    song_id: int,
+    update_data: playlist_schemas.PlaylistSongUpdate,  # schema con new_position
+    current_user = Depends(get_current_user),
+    playlist_service: PlaylistService = Depends(get_playlist_service)
+):
+    pl = get_playlist_by_id(playlist_service.db, playlist_id)
+    if pl is None or pl.owner_id != current_user["id"]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
+    try:
+        return playlist_service.update_song_position(playlist_id, song_id, update_data.position)
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+
+
+@app.delete("/playlist/{playlist_id}/songs")
+def clear_playlist(
+    playlist_id: int,
+    current_user = Depends(get_current_user),
+    playlist_service: PlaylistService = Depends(get_playlist_service)
+):
+    """
+    Elimina todas las canciones de una playlist.
+    """
+    pl = get_playlist_by_id(playlist_service.db, playlist_id)
+    if pl is None or pl.owner_id != current_user["id"]:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
+
+    result = playlist_service.clear_playlist(playlist_id)
+    return {"message": f"{result['deleted']} songs deleted"}
