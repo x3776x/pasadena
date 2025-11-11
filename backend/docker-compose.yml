@@ -169,6 +169,8 @@ services:
     networks:
       - pasadena_network
 
+
+
 # API Gateway
   api_gateway:
     build: ./gateway

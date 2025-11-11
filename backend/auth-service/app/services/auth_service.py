@@ -61,7 +61,9 @@ class AuthService:
                 raise ValueError("Incorrect credentials")
             access_token_expires = timedelta(minutes=security.ACCESS_TOKEN_EXPIRE_MINUTES)
             access_token = security.create_access_token(
-                data={"sub": str(user.id)},
+                data={"sub": str(user.id),
+                      "role_id": user.role_id,
+                },
                 expires_delta=access_token_expires
             )
 
