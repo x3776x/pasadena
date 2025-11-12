@@ -21,20 +21,7 @@ services:
       timeout: 5s
       retries: 5
 
-  mongodb:
-    image: mongo:6-jammy
-    container_name: pasadena_mongo
-    env_file:
-      - .env
-    environment:
-      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
-      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongo_data:/data/db
-    networks:
-      - pasadena_network
+
 
 # auth service
   auth_service:

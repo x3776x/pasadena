@@ -1,7 +1,26 @@
 import pytest
 from fastapi.testclient import TestClient
+from app.database import database
 from app.main import app, get_current_user, get_user_service
 from app.schemas import UserProfileResponse, UserProfileCreate, UserProfileUpdate
+
+@pytest.fixture(scope="session", autouse=True)
+def setup_indexes():
+    from app.database import database
+    database.user_profiles.create_index("user_id", unique=True)
+
+@pytest.fixture(scope="session", autouse=True)
+def seed_user_profile():
+    """create user already exists fails withouth this, lol."""
+    profiles = database.user_profiles
+    profiles.delete_many({})
+    profiles.create_index("user_id", unique=True, background=False)
+    profiles.insert_one({
+        "user_id": 1,
+        "profile_picture": "avatar1.png",
+        "created_at": "2025-11-11T00:00:00Z",
+        "updated_at": "2025-11-11T00:00:00Z"
+    })
 
 # --- Fixtures ---
 @pytest.fixture
