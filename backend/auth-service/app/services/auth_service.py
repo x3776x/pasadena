@@ -59,17 +59,21 @@ class AuthService:
 
             if not user or not security.verify_password(password, user.hashed_password):
                 raise ValueError("Incorrect credentials")
+
             access_token_expires = timedelta(minutes=security.ACCESS_TOKEN_EXPIRE_MINUTES)
             access_token = security.create_access_token(
-                data={"sub": str(user.id)},
+                data={"sub": str(user.id), "role_id": user.role_id},
                 expires_delta=access_token_expires
             )
 
             return schemas.Token(access_token=access_token, token_type="bearer")
+
         except ValueError as e:
             raise e
         except Exception as e:
+            print(f"[LOGIN ERROR] {e}")   # <== Add this temporarily
             raise Exception("Login service unavailable - please try again later")
+
     
     def get_user_by_id(self, user_id: int) -> schemas.User:
         user = user_repository.get_user_by_id(self.db, user_id)

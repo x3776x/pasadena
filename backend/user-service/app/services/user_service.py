@@ -24,7 +24,7 @@ class UserService:
         if not existing_profile:
             raise ValueError("User profile not found")
         
-        update_dict = {k: v for k, v in update_data.dict(). items() if v is not None}
+        update_dict = {k: v for k, v in update_data.model_dump(). items() if v is not None}
         return self.repository.update_user_profile(user_id, update_dict)
     
     def update_profile_picture(self, user_id: int , profile_picture: str):

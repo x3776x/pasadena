@@ -1,12 +1,16 @@
 from passlib.context import CryptContext
 from jose import JWTError, jwt
 from datetime import datetime, timedelta, timezone
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import os
 
 # Configuration - Load from environment variables
 SECRET_KEY = os.getenv("SECRET_KEY")
-ALGORITHM = "HS256"
+ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+security = HTTPBearer()
 
 # Setup password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -29,6 +33,32 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
+
+def verify_token(token: str = Depends(security)) -> dict:
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+    try:
+        payload = jwt.decode(token.credentials, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id = str = payload.get("sub")
+        if user_id is None:
+            raise credentials_exception
+        return payload
+    except JWTError:
+        raise credentials_exception
+
+def get_current_user_id(token: str = Depends(security)) -> int:
+    payload = verify_token(token)
+    user_id: str = payload.get("sub")
+    if user_id is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authentication credentials",
+        )
+    return int(user_id)
 
 def validate_password_complexity(password: str) -> bool:
     """Check password meets complexity requirements"""

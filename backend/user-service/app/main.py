@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from app.services.user_service import UserService, get_user_service
+from app.core.security import get_current_user
 from app import schemas
-from app.database import client
 
 app = FastAPI(
     title="User service",
@@ -12,8 +12,14 @@ app = FastAPI(
 @app.get("/profiles/{user_id}", response_model=schemas.UserProfileResponse)
 def get_user_profile(
     user_id: int,
+    current_user = Depends(get_current_user),
     user_service: UserService = Depends(get_user_service)
 ):
+    if current_user["user_id"] != user_id and current_user["role_id"] != 1:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access forbidden",
+        )
     try:
         profile = user_service.get_profile(user_id)
         if not profile:
@@ -47,8 +53,15 @@ def create_user_profile(
 def update_user_profile(
     user_id: int,
     update_data: schemas.UserProfileUpdate,
+    current_user = Depends(get_current_user),
     user_service: UserService = Depends(get_user_service)
 ):
+    if current_user["user_id"] != user_id and current_user["role_id"] != 1:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access forbidden",
+        )
+    
     try:
         success = user_service.update_profile(user_id, update_data)
         if success:
@@ -68,8 +81,15 @@ def update_user_profile(
 def update_profile_picture(
     user_id: int,
     picture_data: schemas.UserProfileUpdate,
+    current_user = Depends(get_current_user),
     user_service: UserService = Depends(get_user_service)
 ):
+    if current_user["user_id"] != user_id and current_user["role_id"] != 1:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access forbidden",
+        )
+    
     try: 
         success = user_service.update_profile_picture(user_id, picture_data.profile_picture)
         if success:
