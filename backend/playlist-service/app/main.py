@@ -116,7 +116,7 @@ def add_song_to_playlist(
 @app.delete("/playlist/{playlist_id}/songs/{song_id}")
 def remove_song_from_playlist(
     playlist_id: int,
-    song_id: int,
+    song_id: str,
     current_user = Depends(get_current_user),
     playlist_service: PlaylistService = Depends(get_playlist_service)
 ):
@@ -144,7 +144,7 @@ def get_songs_in_playlist(
 @app.put("/playlist/{playlist_id}/songs/{song_id}")
 def update_song_position(
     playlist_id: int,
-    song_id: int,
+    song_id: str,
     update_data: playlist_schemas.PlaylistSongUpdate,  # schema con new_position
     current_user = Depends(get_current_user),
     playlist_service: PlaylistService = Depends(get_playlist_service)

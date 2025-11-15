@@ -22,7 +22,7 @@ def upgrade() -> None:
     op.create_table(
         'playlist_songs',
         sa.Column('playlist_id', sa.Integer, sa.ForeignKey('playlist.id', ondelete='CASCADE'), nullable=False),
-        sa.Column('song_id', sa.Integer, nullable=False),
+        sa.Column('song_id', sa.String(length=100), nullable=False),
         sa.Column('position', sa.Integer, nullable=False),
         sa.PrimaryKeyConstraint('playlist_id', 'song_id')
     )

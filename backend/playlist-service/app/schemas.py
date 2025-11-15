@@ -26,7 +26,7 @@ class Playlist(PlaylistBase):
 # === PLAYLIST SONGS ===
 
 class PlaylistSongBase(BaseModel):
-    song_id: int
+    song_id: str
     position: int
 
 class PlaylistSongCreate(PlaylistSongBase):

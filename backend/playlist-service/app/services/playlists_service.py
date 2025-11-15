@@ -41,7 +41,7 @@ class PlaylistService:
 
     # === PLAYLIST SONGS ===
 
-    def add_song_to_playlist(self, playlist_id: int, song_id: int, position: int):
+    def add_song_to_playlist(self, playlist_id: int, song_id: str, position: int):
         """
         Agrega una canción a la playlist.
         """
@@ -49,7 +49,7 @@ class PlaylistService:
             raise ValueError("Position must be greater than 0")
         return playlist_repository.add_song_to_playlist(self.db, playlist_id, song_id, position)
 
-    def remove_song_from_playlist(self, playlist_id: int, song_id: int):
+    def remove_song_from_playlist(self, playlist_id: int, song_id: str):
         """
         Elimina una canción de la playlist.
         """
@@ -64,7 +64,7 @@ class PlaylistService:
         """
         return playlist_repository.get_songs_in_playlist(self.db, playlist_id)
 
-    def update_song_position(self, playlist_id: int, song_id: int, new_position: int):
+    def update_song_position(self, playlist_id: int, song_id: str, new_position: int):
         """
         Cambia la posición de una canción dentro de la playlist.
         """
@@ -80,7 +80,7 @@ class PlaylistService:
         count = playlist_repository.clear_playlist(self.db, playlist_id)
         return {"deleted": count}
 
-    def is_song_in_playlist(self, playlist_id: int, song_id: int):
+    def is_song_in_playlist(self, playlist_id: int, song_id: str):
         """
         Verifica si una canción está en la playlist.
         """

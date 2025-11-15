@@ -35,7 +35,7 @@ class PlaylistSong(Base):
     __tablename__ = "playlist_songs"
 
     playlist_id = Column(Integer, ForeignKey("playlist.id", ondelete="CASCADE"), primary_key=True)
-    song_id = Column(Integer, primary_key=True, nullable=False)
+    song_id = Column(String(100), primary_key=True, nullable=False)
     position = Column(Integer, nullable=False)
 
     # Relación inversa
