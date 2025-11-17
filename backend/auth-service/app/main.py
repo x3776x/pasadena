@@ -6,11 +6,10 @@ from app.database import get_db
 from app.dependencies.dependencies import get_current_user, oauth2_scheme
 from app.services.auth_service import AuthService, get_auth_service
 from app.services.password_recovery_service import PasswordRecoveryService, get_password_recovery_service
+from sqlalchemy.exc import IntegrityError
 
 app = FastAPI(title="Pasadena")
 # --- Authentication helpers ---
-
-app.mount("/static/avatars", StaticFiles(directory="app/static/avatars"), name="static")
 
 # --- API Endpoints ---
 @app.post("/register", response_model=schemas.User)
@@ -22,8 +21,13 @@ def register(
         return auth_service.register_user(user)
     except ValueError as e:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Service Unavailable, please try again later"
         )
     
 @app.post("/login", response_model=schemas.Token)
@@ -39,16 +43,11 @@ def login(
             detail=str(e),
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
-@app.get("/users/me", response_model=schemas.User)
-def get_current_user_profile(
-    current_user: schemas.User = Depends(get_current_user)
-):
-    return current_user
-
-@app.get("/profile-pictures")
-def get_available_profile_pictures():
-    return {"available_pictures": [pic.value for pic in schemas.AllowedProfilePics]}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Service Unavailable, please try again later"
+        )
 
 @app.post("/password-recovery/initiate", response_model=schemas.PasswordRecoveryResponse)
 def initiate_password_recovery(
@@ -90,16 +89,11 @@ def reset_password(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
-    
+
+@app.get("/verify-token")
+def verify_token(current_user: schemas.User = Depends(get_current_user)):
+    return current_user
 
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
-
-@app.get("/verify-token")
-def verify_token(current_user: schemas.User = Depends(get_current_user)):
-    """
-    Endpoint para que otros servicios (ej. playlist-service) verifiquen un token.
-    Retorna info del usuario si el token es válido.
-    """
-    return current_user

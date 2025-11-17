@@ -1,18 +1,6 @@
-from enum import Enum
-from pydantic import BaseModel, EmailStr, Field
+import re
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
-# Validation for valid profile pictures
-class AllowedProfilePics(str, Enum):
-    avatar1 = "avatar1.png"
-    avatar2 = "avatar2.png"
-    avatar3 = "avatar3.png"
-    avatar4 = "avatar4.png"
-    avatar5 = "avatar5.png"
-    avatar6 = "avatar6.png"
-    avatar7 = "avatar7.png"
-    avatar8 = "avatar8.png"
-    avatar9 = "avatar9.png"
-    avatar10 = "avatar10.png"
 
 # Base schema for shared attributes
 class UserBase(BaseModel):
@@ -21,16 +9,45 @@ class UserBase(BaseModel):
     username: str
     is_active: bool = True
     role_id: int = 2
-    profile_picture: AllowedProfilePics = AllowedProfilePics.avatar1 #Default profile pic
 
 class UserLogin(BaseModel):
     identifier: str
-    password: str = Field(format="password")
+    password: str = Field(min_length=8)
 
 # Schema for creating a user (registration). Includes password.
 class UserCreate(UserBase):
-    password: str = Field(format="password")
+    password: str = Field(min_length=8)
 
+    @field_validator('username')
+    def validate_username(cls, v):
+        if len(v) < 3:
+            raise ValueError('Username must be at least 3 characters')
+        if len(v) > 50:
+            raise ValueError('Username must be less than 50 characters')
+        if not re.match(r'^[a-zA-Z0-9_]+$', v):
+            raise ValueError('Username can only contain letters, numbers and underscores')
+        return v
+    
+    @field_validator('password')
+    def validate_password_strength(cls, v):
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters')
+        if not any(c.isupper() for c in v):
+            raise ValueError('Password must contain at least one uppercase letter')
+        if not any(c.islower() for c in v):
+            raise ValueError('Password must contain at least one lowercase letter')
+        if not any(c.isdigit() for c in v):
+            raise ValueError('Password must contain at least one digit')
+        return v
+    
+    @field_validator('email')
+    def validate_email_domain(cls, v):
+        disposable_domains = ['tempmail.com', 'throwaway.com']
+        domain = v.split('@')[1]
+        if domain in disposable_domains:
+            raise ValueError('Disposable email addresses are not allowed')
+        return v
+    
 # Schema for what we return to the client.
 class User(UserBase):
     id: int
