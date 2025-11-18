@@ -137,6 +137,8 @@ services:
   playlist_service:
     build: ./playlist-service
     container_name: pasadena_playlist_service
+    env_file:
+      - .env
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres_playlist_db:5432/${POSTGRES_PLAYLIST_DB}
     ports:

@@ -3,7 +3,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app import schemas
 from app.database import get_db
-from app.dependencies.dependencies import get_current_user, oauth2_scheme
+from app.security import get_current_user
 from app.services.playlists_service import PlaylistService, get_playlist_service
 from app.repositories.playlist_repository import get_playlist_by_id
 from app import schemas as playlist_schemas
@@ -19,7 +19,7 @@ def create_playlist(
     playlist_service: PlaylistService = Depends(get_playlist_service)
 ):
     try:
-        return playlist_service.create_playlist(current_user["id"], playlist)
+        return playlist_service.create_playlist(current_user["user_id"], playlist)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
@@ -33,7 +33,7 @@ def update_playlist(
 ):
     # Access control: ensure current_user owns the playlist
     pl = get_playlist_by_id(playlist_service.db, playlist_id)
-    if pl is None or pl.owner_id != current_user["id"]:
+    if pl is None or pl.owner_id != current_user["user_id"]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
     try:
         return playlist_service.update_playlist(playlist_id, playlist_update)
@@ -48,7 +48,7 @@ def delete_playlist(
     playlist_service: PlaylistService = Depends(get_playlist_service)
 ):
     pl = get_playlist_by_id(playlist_service.db, playlist_id)
-    if pl is None or pl.owner_id != current_user["id"]:
+    if pl is None or pl.owner_id != current_user["user_id"]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
     try:
         pl.is_active = False
@@ -64,7 +64,7 @@ def like_playlist(
     current_user = Depends(get_current_user),
     playlist_service: PlaylistService = Depends(get_playlist_service)
 ):
-    return playlist_service.add_like(current_user["id"], playlist_id)
+    return playlist_service.add_like(current_user["user_id"], playlist_id)
 
 
 @app.post("/playlist/{playlist_id}/unlike")
@@ -73,7 +73,7 @@ def unlike_playlist(
     current_user = Depends(get_current_user),
     playlist_service: PlaylistService = Depends(get_playlist_service)
 ):
-    success = playlist_service.remove_like(current_user["id"], playlist_id)
+    success = playlist_service.remove_like(current_user["user_id"], playlist_id)
     if not success:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Like not found")
     return {"message": "unliked"}
@@ -105,7 +105,7 @@ def add_song_to_playlist(
     playlist_service: PlaylistService = Depends(get_playlist_service)
 ):
     pl = get_playlist_by_id(playlist_service.db, playlist_id)
-    if pl is None or pl.owner_id != current_user["id"]:
+    if pl is None or pl.owner_id != current_user["user_id"]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
     try:
         return playlist_service.add_song_to_playlist(playlist_id, song.song_id, song.position)
@@ -121,7 +121,7 @@ def remove_song_from_playlist(
     playlist_service: PlaylistService = Depends(get_playlist_service)
 ):
     pl = get_playlist_by_id(playlist_service.db, playlist_id)
-    if pl is None or pl.owner_id != current_user["id"]:
+    if pl is None or pl.owner_id != current_user["user_id"]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
     try:
         playlist_service.remove_song_from_playlist(playlist_id, song_id)
@@ -150,7 +150,7 @@ def update_song_position(
     playlist_service: PlaylistService = Depends(get_playlist_service)
 ):
     pl = get_playlist_by_id(playlist_service.db, playlist_id)
-    if pl is None or pl.owner_id != current_user["id"]:
+    if pl is None or pl.owner_id != current_user["user_id"]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
     try:
         return playlist_service.update_song_position(playlist_id, song_id, update_data.position)
@@ -168,7 +168,7 @@ def clear_playlist(
     Elimina todas las canciones de una playlist.
     """
     pl = get_playlist_by_id(playlist_service.db, playlist_id)
-    if pl is None or pl.owner_id != current_user["id"]:
+    if pl is None or pl.owner_id != current_user["user_id"]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
 
     result = playlist_service.clear_playlist(playlist_id)
