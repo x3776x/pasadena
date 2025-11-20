@@ -81,5 +81,19 @@ class AuthService:
             raise ValueError("User not found")
         return user
     
+    def get_all_users(self, limit: int = 100, offset: int = 0):
+        users = user_repository.get_all_users(self.db, limit=limit, offset=offset)
+        if not users:
+            raise ValueError("No users registered/active")
+        return users
+    
+    def update_user(self, user_id: int, user_data: schemas.UserUpdate):
+        updates = user_data.model_dump(exclude_none=True)
+
+        updated = user_repository.update_user(self.db, user_id, updates)
+        if not updated:
+            raise ValueError("User not found")
+        return updated
+
 def get_auth_service(db: Session = Depends(get_db)):
     return AuthService(db)

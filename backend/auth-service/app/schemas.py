@@ -1,5 +1,6 @@
 import re
 from pydantic import BaseModel, EmailStr, Field, field_validator
+from typing import Optional
 
 
 # Base schema for shared attributes
@@ -82,3 +83,10 @@ class PasswordReset(BaseModel):
 class PasswordRecoveryResponse(BaseModel):
     message: str
     expires_in: int
+
+#update user fields
+class UserUpdate(BaseModel):
+    is_active: Optional[bool] = None
+    full_name: Optional[str] = None
+    username: Optional[str] = None
+    role_id: Optional[int] = None

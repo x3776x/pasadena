@@ -1,12 +1,10 @@
 from fastapi import FastAPI, Depends, HTTPException, status
-from fastapi.staticfiles import StaticFiles
 
 from app import schemas
 from app.database import get_db
 from app.dependencies.dependencies import get_current_user, oauth2_scheme
 from app.services.auth_service import AuthService, get_auth_service
 from app.services.password_recovery_service import PasswordRecoveryService, get_password_recovery_service
-from sqlalchemy.exc import IntegrityError
 
 app = FastAPI(title="Pasadena")
 # --- Authentication helpers ---
@@ -97,3 +95,57 @@ def verify_token(current_user: schemas.User = Depends(get_current_user)):
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
+
+
+#user mgmt
+@app.get("/users", response_model=list[schemas.User])
+def list_users(
+    limit: int = 50,
+    offset: int = 0,
+    auth_service: AuthService = Depends(get_auth_service)
+):
+    try:
+        return auth_service.get_all_users(limit=limit, offset=offset)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except ConnectionError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(e)
+        )
+    
+@app.get("/users/{user_id}", response_model=schemas.User)
+def get_user(
+    user_id: int,
+    auth_service: AuthService = Depends(get_auth_service)
+):
+    try:
+        return auth_service.get_user_by_id(user_id)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+
+
+@app.patch("/users/{user_id}", response_model=schemas.User)
+def update_user(
+    user_id: int,
+    user_data: schemas.UserUpdate,
+    auth_service: AuthService = Depends(get_auth_service)
+):
+    try:
+        return auth_service.update_user(user_id, user_data)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except ConnectionError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(e)
+        )
