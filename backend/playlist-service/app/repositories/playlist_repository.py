@@ -15,7 +15,7 @@ def create_playlist(db: Session, owner_id: int, playlist: schemas.PlaylistCreate
         name=playlist.name,
         is_public=playlist.is_public,
         owner_id=owner_id,
-        playlist_cover=playlist.playlist_cover
+        playlist_cover=None
     )
     db.add(db_playlist)
     db.commit()
