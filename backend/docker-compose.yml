@@ -1,3 +1,5 @@
+name: pasadena
+
 # backend/docker-compose.yml
 services:
   postgres_auth_db:
@@ -35,7 +37,7 @@ services:
       - SECRET_KEY=${SECRET_KEY}
       - MAIL_ADDRESS=${MAIL_ADDRESS}
       - MAIL_PASS=${MAIL_PASS}
-      - USER_SERVICE_URL=http://user_service:8003/profiles
+      - USER_SERVICE_URL=${USER_SERVICE_URL}
     ports:
       - "8001:8001"
     command: >
@@ -160,6 +162,25 @@ services:
     volumes:
       - ./playlist-service/app/static:/app/static
 
+# admin postgres db
+  admin_service:
+    build: ./admin-service
+    container_name: pasadena_admin_service
+    env_file:
+      - .env
+    environment:
+      - AUTH_SERVICE_URL=${AUTH_SERVICE_URL}
+    ports:
+      - "8004:8004"
+    depends_on:
+      - auth_service
+    networks:
+      - pasadena_network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8004/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
 
 
 # API Gateway
@@ -172,6 +193,7 @@ services:
       - auth_service
       - playlist_service
       - user_service
+      - admin_service
     networks:
       - pasadena_network
 
