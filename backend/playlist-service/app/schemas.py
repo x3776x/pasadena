@@ -8,17 +8,21 @@ class PlaylistBase(BaseModel):
 
 
 class PlaylistCreate(PlaylistBase):
-    pass
+    name: str
+    is_public: bool
+    playlist_cover: str | None = None
 
 
 class PlaylistUpdate(BaseModel):
     name: str | None = None
     is_public: bool | None = None
+    playlist_cover: str | None = None
 
 
 class Playlist(PlaylistBase):
     id: int
     owner_id: int
+    playlist_cover: str | None = None
 
     class Config:
         from_attributes = True

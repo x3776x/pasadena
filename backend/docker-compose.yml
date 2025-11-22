@@ -157,6 +157,8 @@ services:
       - postgres_playlist_db
     networks:
       - pasadena_network
+    volumes:
+      - ./playlist-service/app/static:/app/static
 
 
 

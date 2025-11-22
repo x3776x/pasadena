@@ -1,5 +1,7 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.staticfiles import StaticFiles
+from fastapi import UploadFile, File
+from pathlib import Path
 
 from app import schemas
 from app.database import get_db
@@ -7,9 +9,15 @@ from app.security import get_current_user
 from app.services.playlists_service import PlaylistService, get_playlist_service
 from app.repositories.playlist_repository import get_playlist_by_id
 from app import schemas as playlist_schemas
+import os
+import uuid
 
 app = FastAPI(title="Playlist Service")
 
+app.mount("/static", StaticFiles(directory="/app/static"), name="static")
+
+STATIC_PLAYLISTS_DIR = Path("/app/static")
+STATIC_PLAYLISTS_DIR.mkdir(parents=True, exist_ok=True)
 
 # --- API Endpoints ---
 @app.post("/playlist", response_model=playlist_schemas.Playlist)
@@ -93,6 +101,61 @@ def get_all_playlists(
 ):
     """Obtiene todas las playlists, activas e inactivas."""
     return playlist_service.get_all_playlists()
+
+@app.post("/playlist/{playlist_id}/cover", response_model=playlist_schemas.Playlist)
+async def upload_playlist_cover(
+    playlist_id: int,
+    file: UploadFile = File(...),
+    current_user = Depends(get_current_user),
+    playlist_service: PlaylistService = Depends(get_playlist_service)
+):
+    # 1) Verificar permisos y existencia
+    pl = get_playlist_by_id(playlist_service.db, playlist_id)
+    if pl is None or pl.owner_id != current_user["user_id"]:
+        raise HTTPException(status_code=403, detail="Not allowed")
+
+    # 2) Validar tipo de archivo
+    if not file.content_type or not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="Only image files are allowed")
+
+    # 3) Generar nombre único y ruta de guardado
+    _, ext = os.path.splitext(file.filename)
+    # si ext está vacío, puedes forzar .png por ejemplo:
+    if not ext:
+        ext = ".png"
+    filename = f"{uuid.uuid4().hex}{ext}"
+    save_path = STATIC_PLAYLISTS_DIR / filename
+
+    # 4) Guardar archivo de forma segura
+    try:
+        content = await file.read()
+        save_path.write_bytes(content)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save file: {e}")
+
+    # 5) (Opcional) Borrar cover anterior si existía
+    try:
+        old_cover = pl.playlist_cover
+        if old_cover:
+            old_path = STATIC_PLAYLISTS_DIR / old_cover
+            # evita borrar si es igual al nuevo o si no existe
+            if old_path.exists() and old_cover != filename:
+                try:
+                    old_path.unlink()
+                except Exception:
+                    # no crítico, solo un log en producción
+                    pass
+    except Exception:
+        # no queremos que la limpieza bloquee la respuesta
+        pass
+
+    # 6) Actualizar en BD (usando tu servicio y schema de update)
+    updated_playlist = playlist_service.update_playlist(
+        playlist_id,
+        playlist_schemas.PlaylistUpdate(playlist_cover=filename)
+    )
+
+    return updated_playlist
 
 
 # === PLAYLIST SONGS ===

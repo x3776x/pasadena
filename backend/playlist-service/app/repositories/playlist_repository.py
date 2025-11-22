@@ -14,7 +14,8 @@ def create_playlist(db: Session, owner_id: int, playlist: schemas.PlaylistCreate
     db_playlist = models.Playlist(
         name=playlist.name,
         is_public=playlist.is_public,
-        owner_id=owner_id
+        owner_id=owner_id,
+        playlist_cover=playlist.playlist_cover
     )
     db.add(db_playlist)
     db.commit()
@@ -26,13 +27,21 @@ def update_playlist(db: Session, playlist_id: int, playlist_update: schemas.Play
     db_playlist = get_playlist_by_id(db, playlist_id)
     if not db_playlist:
         return None
+
+    # Solo actualiza los campos que fueron enviados
     if playlist_update.name is not None:
         db_playlist.name = playlist_update.name
+
     if playlist_update.is_public is not None:
         db_playlist.is_public = playlist_update.is_public
+
+    if playlist_update.playlist_cover is not None:
+        db_playlist.playlist_cover = playlist_update.playlist_cover
+
     db.commit()
     db.refresh(db_playlist)
     return db_playlist
+
 
 
 def delete_playlist(db: Session, playlist_id: int):
@@ -86,7 +95,7 @@ def get_all_playlists(db: Session):
 
 # === MÉTODOS PARA MANEJAR LA TABLA playlist_songs ===
 
-def add_song_to_playlist(db: Session, playlist_id: int, song_id: int, position: int):
+def add_song_to_playlist(db: Session, playlist_id: int, song_id: str, position: int):
     """
     Agrega una canción a una playlist en una posición específica.
     Si ya existe, devuelve la entrada existente.
@@ -110,7 +119,7 @@ def add_song_to_playlist(db: Session, playlist_id: int, song_id: int, position: 
     return playlist_song
 
 
-def remove_song_from_playlist(db: Session, playlist_id: int, song_id: int) -> bool:
+def remove_song_from_playlist(db: Session, playlist_id: int, song_id: str) -> bool:
     """
     Elimina una canción específica de una playlist.
     """
@@ -135,7 +144,7 @@ def get_songs_in_playlist(db: Session, playlist_id: int):
     ).order_by(models.PlaylistSong.position.asc()).all()
 
 
-def update_song_position(db: Session, playlist_id: int, song_id: int, new_position: int):
+def update_song_position(db: Session, playlist_id: int, song_id: str, new_position: int):
     """
     Actualiza la posición de una canción dentro de la playlist.
     """
@@ -164,7 +173,7 @@ def clear_playlist(db: Session, playlist_id: int) -> int:
     return deleted
 
 
-def is_song_in_playlist(db: Session, playlist_id: int, song_id: int) -> bool:
+def is_song_in_playlist(db: Session, playlist_id: int, song_id: str) -> bool:
     """
     Verifica si una canción está en la playlist.
     """
