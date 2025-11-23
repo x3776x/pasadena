@@ -1,66 +1,138 @@
-# tests/test_playlist.py
-import pytest
 from fastapi import status
-from fastapi.testclient import TestClient
-from app.main import app
-from app.database import Base, get_db
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+import io
 
-# -----------------------------
-# Configuración de BD SQLite temporal
-# -----------------------------
-SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
-TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# ============================================
+# playlist
+# ============================================
 
-Base.metadata.create_all(bind=engine)
-
-# -----------------------------
-# Fixtures
-# -----------------------------
-@pytest.fixture
-def client():
-    """Crea un cliente de prueba de FastAPI."""
-    return TestClient(app)
-
-@pytest.fixture
-def override_get_db():
-    """Usa una base de datos SQLite temporal en lugar de Postgres."""
-    db = TestingSessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-# Override de dependencia global de la app
-app.dependency_overrides[get_db] = override_get_db
-
-@pytest.fixture(autouse=True)
-def mock_auth(monkeypatch):
-    """Mockea la verificación de token del servicio de auth."""
-    def fake_get(url, headers=None):
-        class FakeResponse:
-            status_code = 200
-            def json(self):
-                return {"id": 1, "email": "mockuser@example.com"}
-        return FakeResponse()
-    monkeypatch.setattr("app.dependencies.dependencies.requests.get", fake_get)
-
-# -----------------------------
-# Tests
-# -----------------------------
 def test_create_playlist(client):
     response = client.post(
         "/playlist",
-        json={"name": "Rock Classics", "description": "Old but gold"},
-        headers={"Authorization": "Bearer test-token"},
+        json={"name": "Rock Classics", "is_public": True},
+        headers={"Authorization": "Bearer faketoken"}
     )
-    print(response.json())
+    print("Response JSON:", response.json())
     assert response.status_code == 200
+    assert response.json()["name"] == "Rock Classics"
+
+
+def test_delete_playlist(client):
+    pl = client.post("/playlist", json={"name": "Pop", "is_public": True}).json()
+    print("Create response:", pl)
+
+    res = client.delete(f"/playlist/{pl['id']}")
+    print("Delete response:", res.json()) 
+
+    assert res.status_code == 200
+    assert res.json()["message"] == "deleted"
+
+
+def test_update_playlist(client):
+    # Crear
+    res = client.post("/playlist", json={"name": "Rock", "is_public": True})
+    pl = res.json()
+
+    # Actualizar
+    update_res = client.put(
+        f"/playlist/{pl['id']}",
+        json={"name": "Rock Reloaded"},
+    )
+
+    assert update_res.status_code == 200
+    assert update_res.json()["name"] == "Rock Reloaded"
 
 
 def test_get_all_playlists(client):
-    response = client.get("/playlist/all")
-    assert response.status_code == status.HTTP_200_OK
+    response = client.get(
+        "/playlist/all",
+        headers={"Authorization": "Bearer faketoken"}
+    )
+    
+    assert response.status_code == 200
     assert isinstance(response.json(), list)
+
+# ============================================
+# likes
+# ============================================
+
+def test_like_playlist(client):
+    pl = client.post("/playlist", json={"name": "Jazz", "is_public": True}).json()
+
+    res = client.post(f"/playlist/{pl['id']}/like")
+
+    assert res.status_code == 200
+
+
+def test_unlike_playlist(client):
+    pl = client.post("/playlist", json={"name": "Metal", "is_public": True}).json()
+
+    client.post(f"/playlist/{pl['id']}/like")  # like primero
+
+    res = client.post(f"/playlist/{pl['id']}/unlike")
+
+    assert res.status_code == 200
+    assert res.json()["message"] == "unliked"
+
+
+# ============================================
+# cancion_playlist
+# ============================================
+
+def test_add_song_to_playlist(client):
+    pl = client.post("/playlist", json={"name": "EDM", "is_public": True}).json()
+
+    res = client.post(
+        f"/playlist/{pl['id']}/songs",
+        json={"song_id": "123", "position": 1},
+    )
+
+    assert res.status_code == 200
+
+def test_get_songs_in_playlist(client):
+    pl = client.post("/playlist", json={"name": "Chill", "is_public": True}).json()
+
+    client.post(f"/playlist/{pl['id']}/songs", json={"song_id": "AAA", "position": 1})
+
+    res = client.get(f"/playlist/{pl['id']}/songs")
+
+    assert res.status_code == 200
+    assert len(res.json()) == 1
+
+def test_remove_song_from_playlist(client):
+    pl = client.post("/playlist", json={"name": "Trap", "is_public": True}).json()
+
+    client.post(f"/playlist/{pl['id']}/songs", json={"song_id": "X1", "position": 1})
+
+    res = client.delete(f"/playlist/{pl['id']}/songs/X1")
+
+    assert res.status_code == 200
+
+def test_clear_playlist(client):
+    pl = client.post("/playlist", json={"name": "Workout", "is_public": True}).json()
+
+    client.post(f"/playlist/{pl['id']}/songs", json={"song_id": "A", "position": 1})
+    client.post(f"/playlist/{pl['id']}/songs", json={"song_id": "B", "position": 2})
+
+    res = client.delete(f"/playlist/{pl['id']}/songs")
+
+    assert res.status_code == 200
+    assert "songs deleted" in res.json()["message"]
+
+# ============================================
+# cover 
+# ============================================
+
+def test_upload_cover(client):
+    pl = client.post("/playlist", json={"name": "CoverTest", "is_public": True}).json()
+
+    file_data = io.BytesIO(b"fake image content")
+
+    res = client.post(
+        f"/playlist/{pl['id']}/cover",
+        files={"file": ("photo.png", file_data, "image/png")},
+    )
+
+    assert res.status_code == 200
+    assert res.json()["playlist_cover"].endswith(".png")
+
+

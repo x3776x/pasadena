@@ -102,6 +102,13 @@ def get_all_playlists(
     """Obtiene todas las playlists, activas e inactivas."""
     return playlist_service.get_all_playlists()
 
+@app.get("/playlist/{playlist_id}", response_model=playlist_schemas.Playlist)
+def get_playlist_endpoint(
+    playlist_id: int,
+    playlist_service: PlaylistService = Depends(get_playlist_service)
+):
+    return playlist_service.get_playlist_by_id(playlist_id)
+
 @app.post("/playlist/{playlist_id}/cover", response_model=playlist_schemas.Playlist)
 async def upload_playlist_cover(
     playlist_id: int,

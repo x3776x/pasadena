@@ -39,6 +39,9 @@ class PlaylistService:
     def get_all_playlists(self):
         return playlist_repository.get_all_playlists(self.db)
 
+    def get_playlist_by_id(self, playlist_id: int):
+        return playlist_repository.get_playlist_by_id(self.db, playlist_id)
+
     # === PLAYLIST SONGS ===
 
     def add_song_to_playlist(self, playlist_id: int, song_id: str, position: int):
