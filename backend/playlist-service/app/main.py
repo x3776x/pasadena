@@ -66,7 +66,7 @@ def delete_playlist(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 
-@app.post("/playlist/{playlist_id}/like")
+@app.post("/playlist/{playlist_id}/like", response_model=playlist_schemas.PlaylistLike)
 def like_playlist(
     playlist_id: int,
     current_user = Depends(get_current_user),

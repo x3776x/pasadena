@@ -1,5 +1,6 @@
 from enum import Enum
 from pydantic import BaseModel, EmailStr, Field
+from datetime import datetime
 
 # Playlist schemas
 class PlaylistBase(BaseModel):
@@ -26,6 +27,19 @@ class Playlist(PlaylistBase):
 
     class Config:
         from_attributes = True
+
+
+# === PLAYLIST LIKES ===
+
+class PlaylistLike(BaseModel):
+    user_id: int
+    playlist_id: int
+    created_at: datetime | None = None
+
+    class Config:
+        from_attributes = True
+
+
 
 # === PLAYLIST SONGS ===
 
