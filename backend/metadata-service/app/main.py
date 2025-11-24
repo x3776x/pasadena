@@ -1,6 +1,7 @@
 import asyncio
 import grpc
 from concurrent import futures
+from database import Base
 from sqlalchemy import create_engine  # ✅ Engine sincrónico
 from models.song_model import Base
 from database import engine  # Este es el async engine
@@ -13,6 +14,7 @@ def create_tables_sync():
     """Crea las tablas usando un engine sincrónico."""
     from sqlalchemy import create_engine
     sync_engine = create_engine("postgresql://papu:CocteauTwins@postgres_metadata_db:5432/postgres_metadata_db")
+
     Base.metadata.create_all(bind=sync_engine)
     print("✅ Tablas creadas (modo sincrónico)")
 

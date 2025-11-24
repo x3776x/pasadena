@@ -28,3 +28,14 @@ AsyncSessionFactory = sessionmaker(
     class_=AsyncSession,
     expire_on_commit=False # Práctica recomendada para sesiones asíncronas
 )
+
+
+from sqlalchemy import create_engine
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
+
+SQLALCHEMY_DATABASE_URL = "postgresql://papu:CocteauTwins@postgres_metadata_db:5432/postgres_metadata_db"
+
+engine = create_engine(SQLALCHEMY_DATABASE_URL)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()

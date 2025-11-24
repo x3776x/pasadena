@@ -9,3 +9,4 @@ sqlalchemy
 databases
 SQLAlchemy>=2.0
 asyncpg
+uvicorn
