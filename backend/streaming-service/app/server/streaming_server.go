@@ -1,119 +1,88 @@
-// streaming-service/app/server/streaming_server.go
 package server
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log"
 	"os"
 	"path/filepath"
 
-	"app/app/proto"
+	"app/proto"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/gridfs"
 )
 
-type StreamingServer struct {
+type Server struct {
 	proto.UnimplementedStreamingServiceServer
-	musicDirectory string
+	DB *mongo.Database
 }
 
-func NewStreamingServer(musicDir string) *StreamingServer {
-	return &StreamingServer{
-		musicDirectory: musicDir,
-	}
+// Constructor
+func NewStreamingServer(db *mongo.Database) *Server {
+	return &Server{DB: db}
 }
 
-func (s *StreamingServer) StreamSong(req *proto.StreamRequest, stream proto.StreamingService_StreamSongServer) error {
-	songID := req.SongId
-	log.Printf("🔄 Iniciando streaming para canción: %s", songID)
-
-	// 1. Buscar el archivo de audio
-	audioPath, err := s.findAudioFile(songID)
-	if err != nil {
-		return fmt.Errorf("❌ error buscando archivo de audio: %v", err)
+func (s *Server) StreamSong(req *proto.StreamRequest, stream proto.StreamingService_StreamSongServer) error {
+	if s.DB == nil {
+		return stream.Send(&proto.StreamResponse{
+			Chunk: []byte("MongoDB no conectado"),
+		})
 	}
 
-	log.Printf("📁 Archivo encontrado: %s", audioPath)
-
-	// 2. Abrir el archivo
-	file, err := os.Open(audioPath)
+	bucket, err := gridfs.NewBucket(s.DB)
 	if err != nil {
-		return fmt.Errorf("❌ error abriendo archivo: %v", err)
-	}
-	defer file.Close()
-
-	// 3. Obtener información del archivo para logging
-	fileInfo, err := file.Stat()
-	if err != nil {
-		return fmt.Errorf("❌ error obteniendo info del archivo: %v", err)
+		return err
 	}
 
-	log.Printf("📊 Tamaño del archivo: %d bytes", fileInfo.Size())
+	var fileID interface{}
+	cursor, err := s.DB.Collection("fs.files").Find(context.Background(), bson.M{"filename": req.SongId})
+	if err != nil {
+		return err
+	}
+	defer cursor.Close(context.Background())
 
-	// 4. Stream por chunks
-	chunkSize := 64 * 1024 // 64KB
-	buffer := make([]byte, chunkSize)
-	totalSent := 0
+	found := false
+	for cursor.Next(context.Background()) {
+		doc := make(map[string]interface{})
+		if err := cursor.Decode(&doc); err != nil {
+			return err
+		}
+		fileID = doc["_id"]
+		found = true
+		break
+	}
+
+	if !found {
+		return stream.Send(&proto.StreamResponse{
+			Chunk: []byte("Archivo no encontrado"),
+		})
+	}
+
+	downloadStream, err := bucket.OpenDownloadStream(fileID)
+	if err != nil {
+		return err
+	}
+	defer downloadStream.Close()
+
+	const chunkSize = 64 * 1024
+	buf := make([]byte, chunkSize)
 
 	for {
-		// Leer chunk del archivo
-		n, err := file.Read(buffer)
-		if err == io.EOF {
-			log.Printf("✅ Streaming completado para %s. Total enviado: %d bytes", songID, totalSent)
+		n, err := downloadStream.Read(buf)
+		if err != nil && err != io.EOF {
+			return err
+		}
+		if n == 0 {
 			break
 		}
-		if err != nil {
-			return fmt.Errorf("❌ error leyendo archivo: %v", err)
-		}
 
-		// Crear respuesta
-		response := &proto.StreamResponse{
-			Chunk: buffer[:n],
-		}
-
-		// Enviar chunk al cliente
-		if err := stream.Send(response); err != nil {
-			return fmt.Errorf("❌ error enviando chunk: %v", err)
-		}
-
-		totalSent += n
-
-		// Log cada 10 chunks para no saturar los logs
-		if (totalSent/chunkSize)%10 == 0 {
-			log.Printf("📤 Enviado %d bytes para %s", totalSent, songID)
+		if err := stream.Send(&proto.StreamResponse{Chunk: buf[:n]}); err != nil {
+			return err
 		}
 	}
 
-	log.Printf("🎉 Streaming finalizado exitosamente para %s", songID)
+	log.Println("Streaming completado para song_id:", req.SongId)
 	return nil
-}
-
-// findAudioFile busca el archivo de audio por songID
-func (s *StreamingServer) findAudioFile(songID string) (string, error) {
-	// Posibles extensiones de audio
-	extensions := []string{".mp3", ".wav", ".flac", ".m4a", ".ogg"}
-
-	for _, ext := range extensions {
-		audioPath := filepath.Join(s.musicDirectory, songID+ext)
-		if _, err := os.Stat(audioPath); err == nil {
-			return audioPath, nil
-		}
-	}
-
-	// Si no encuentra con extensiones, buscar cualquier archivo que comience con el songID
-	files, err := os.ReadDir(s.musicDirectory)
-	if err != nil {
-		return "", fmt.Errorf("error leyendo directorio de música: %v", err)
-	}
-
-	for _, file := range files {
-		if !file.IsDir() {
-			filename := file.Name()
-			// Verificar si el archivo comienza con el songID
-			if len(filename) >= len(songID) && filename[:len(songID)] == songID {
-				return filepath.Join(s.musicDirectory, filename), nil
-			}
-		}
-	}
-
-	return "", fmt.Errorf("archivo de audio no encontrado para songID: %s en directorio: %s", songID, s.musicDirectory)
 }
