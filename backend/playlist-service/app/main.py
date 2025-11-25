@@ -102,12 +102,49 @@ def get_all_playlists(
     """Obtiene todas las playlists, activas e inactivas."""
     return playlist_service.get_all_playlists()
 
+
+@app.get("/playlist/public", response_model=list[playlist_schemas.Playlist])
+def get_public_playlists(
+    playlist_service: PlaylistService = Depends(get_playlist_service)
+):
+    """Obtiene todas las playlists publicas."""
+    return playlist_service.get_public_playlists()
+
+
+@app.get("/playlist/{owner_id}/public", response_model=list[playlist_schemas.Playlist])
+def get_public_playlists_by_owner(
+    owner_id: int,
+    playlist_service: PlaylistService = Depends(get_playlist_service)
+):
+    """Obtiene todas las playlists publicas."""
+    return playlist_service.get_public_playlists_by_owner(owner_id)
+
+
 @app.get("/playlist/{playlist_id}", response_model=playlist_schemas.Playlist)
-def get_playlist_endpoint(
+def get_playlist_id_endpoint(
     playlist_id: int,
     playlist_service: PlaylistService = Depends(get_playlist_service)
 ):
     return playlist_service.get_playlist_by_id(playlist_id)
+
+
+@app.get("/playlist/{owner_id}/owner", response_model=list[playlist_schemas.Playlist])
+def get_playlists_by_owner(
+    owner_id: int,
+    playlist_service: PlaylistService = Depends(get_playlist_service)
+):
+    return playlist_service.get_playlists_by_owner(owner_id)
+
+
+@app.get("/playlist/{user_id}/liked-playlists", response_model=list[playlist_schemas.Playlist])
+def get_playlists_liked_by_user(
+    user_id: int,
+    playlist_service: PlaylistService = Depends(get_playlist_service)
+):
+    """Obtiene todas las playlists, activas e inactivas."""
+    return playlist_service.get_playlists_liked_by_user(user_id)
+
+
 
 @app.post("/playlist/{playlist_id}/cover", response_model=playlist_schemas.Playlist)
 async def upload_playlist_cover(

@@ -52,6 +52,27 @@ def delete_playlist(db: Session, playlist_id: int):
     db.commit()
     return True
 
+
+def get_active_playlists(db: Session):
+    return db.query(models.Playlist).filter(models.Playlist.is_active == True).all()
+
+def get_public_playlists(db: Session):
+    return db.query(models.Playlist).filter(models.Playlist.is_public == True).all()
+
+def get_public_playlists_by_owner(db: Session, owner_id: int):
+    return (
+        db.query(models.Playlist)
+        .filter(
+            models.Playlist.owner_id == owner_id,
+            models.Playlist.is_public == True
+        )
+        .all()
+    )
+
+
+def get_all_playlists(db: Session):
+    return db.query(models.Playlist).all()
+
 # === MÉTODOS PARA MANEJAR LA TABLA playlist_likes ===
 
 
@@ -87,11 +108,14 @@ def is_liked(db: Session, user_id: int, playlist_id: int) -> bool:
     ).first()
     return existing is not None
 
-def get_active_playlists(db: Session):
-    return db.query(models.Playlist).filter(models.Playlist.is_active == True).all()
 
-def get_all_playlists(db: Session):
-    return db.query(models.Playlist).all()
+def get_playlists_liked_by_user(db: Session, user_id: int):
+    return (
+        db.query(models.Playlist)
+        .join(models.PlaylistLike, models.Playlist.id == models.PlaylistLike.playlist_id)
+        .filter(models.PlaylistLike.user_id == user_id)
+        .all()
+    )
 
 # === MÉTODOS PARA MANEJAR LA TABLA playlist_songs ===
 

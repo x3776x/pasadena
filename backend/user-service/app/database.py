@@ -34,3 +34,4 @@ def get_database(retries: int = 10, delay: int = 3):
 
 database = get_database()
 user_profiles = database.user_profiles
+follows = database.follows

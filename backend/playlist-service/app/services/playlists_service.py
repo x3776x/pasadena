@@ -35,12 +35,29 @@ class PlaylistService:
     
     def get_active_playlists(self):
         return playlist_repository.get_active_playlists(self.db)
+    
+    def get_public_playlists(self):
+        return playlist_repository.get_public_playlists(self.db)
+    
+    def get_public_playlists_by_owner(self, owner_id: int):
+        return playlist_repository.get_public_playlists_by_owner(self.db, owner_id)
 
     def get_all_playlists(self):
         return playlist_repository.get_all_playlists(self.db)
 
     def get_playlist_by_id(self, playlist_id: int):
-        return playlist_repository.get_playlist_by_id(self.db, playlist_id)
+        playlist = playlist_repository.get_playlist_by_id(self.db, playlist_id)
+        if not playlist:
+            raise ValueError("Playlist found")
+        return playlist
+
+
+    def get_playlists_by_owner(self, owner_id: int):
+        return playlist_repository.get_playlists_by_owner(self.db, owner_id)
+        
+    
+    def get_playlists_liked_by_user(self, user_id: int):
+        return playlist_repository.get_playlists_liked_by_user(self.db, user_id)
 
     # === PLAYLIST SONGS ===
 
