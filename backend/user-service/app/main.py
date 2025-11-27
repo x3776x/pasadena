@@ -105,6 +105,86 @@ def update_profile_picture(
             detail=str(e)
         )
     
+
+# === FOLLOW ENDPOINTS ===
+
+@app.post("/users/{followed_id}/follow", response_model=dict)
+def follow_user(
+    followed_id: int,
+    current_user = Depends(get_current_user),
+    user_service: UserService = Depends(get_user_service)
+):
+    try:
+        follow_id = user_service.follow_user(current_user["user_id"], followed_id)
+        return {"message": "Followed successfully", "follow_id": follow_id}
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Database error: {str(e)}"
+        )
+
+
+@app.delete("/users/{followed_id}/unfollow", response_model=dict)
+def unfollow_user(
+    followed_id: int,
+    current_user = Depends(get_current_user),
+    user_service: UserService = Depends(get_user_service)
+):
+    try:
+        success = user_service.unfollow_user(current_user["user_id"], followed_id)
+        if success:
+            return {"message": "Unfollowed successfully"}
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Follow relationship not found"
+            )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Database error: {str(e)}"
+        )
+
+
+@app.get("/users/{user_id}/following", response_model=list[schemas.FollowResponse])
+def get_following(
+    user_id: int,
+    user_service: UserService = Depends(get_user_service)
+):
+    try:
+        return user_service.get_following(user_id)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Database error: {str(e)}"
+        )
+
+
+@app.get("/users/{user_id}/followers", response_model=list[schemas.FollowResponse])
+def get_followers(
+    user_id: int,
+    user_service: UserService = Depends(get_user_service)
+):
+    try:
+        return user_service.get_followers(user_id)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Database error: {str(e)}"
+        )
+
+
+    
 @app.get("/health")
 def health_check():
     return {"status": "OK"}

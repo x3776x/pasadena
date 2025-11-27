@@ -31,3 +31,27 @@ class UserProfileResponse(UserProfileBase):
 
     class Config:
         from_attributes = True
+
+
+# === FOLLOW SCHEMAS ===
+
+class FollowBase(BaseModel):
+    follower_id: int = Field(..., description="User who follows")
+    followed_id: int = Field(..., description="User being followed")
+
+class FollowCreate(FollowBase):
+    """Schema para crear un follow (seguir a un usuario)."""
+    pass
+
+class FollowResponse(FollowBase):
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+        json_schema_extra = {
+            "example": {
+                "follower_id": 10,
+                "followed_id": 20,
+                "created_at": "2023-01-01T12:00:00"
+            }
+        }

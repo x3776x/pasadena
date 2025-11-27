@@ -1,5 +1,5 @@
-from app.database import user_profiles
-from app.models import UserProfile
+from app.database import user_profiles, follows
+from app.models import UserProfile, Follow
 from bson import ObjectId
 from datetime import datetime
 
@@ -29,3 +29,41 @@ class UserRepository:
             {"$set": update_data}
         )
         return result.modified_count > 0
+    
+    @staticmethod
+    def follow_user(follower_id: int, followed_id: int):
+        follow_doc = {
+            "follower_id": follower_id,
+            "followed_id": followed_id,
+            "created_at": datetime.now()
+        }
+        result = follows.insert_one(follow_doc)
+        return str(result.inserted_id)
+
+    @staticmethod
+    def unfollow_user(follower_id: int, followed_id: int):
+        result = follows.delete_one({
+            "follower_id": follower_id,
+            "followed_id": followed_id
+        })
+        return result.deleted_count > 0
+    
+    @staticmethod
+    def get_following(user_id: int):
+        """Usuarios que sigue este user_id"""
+        cursor = follows.find({"follower_id": user_id})
+        return [Follow(**{**doc, "created_at": doc["created_at"]}) for doc in cursor]
+
+    @staticmethod
+    def get_followers(user_id: int):
+        """Usuarios que siguen a este user_id"""
+        cursor = follows.find({"followed_id": user_id})
+        return [Follow(**{**doc, "created_at": doc["created_at"]}) for doc in cursor]
+
+    @staticmethod
+    def is_following(follower_id: int, followed_id: int) -> bool:
+        """Verifica si follower_id ya sigue a followed_id"""
+        return follows.find_one({
+            "follower_id": follower_id,
+            "followed_id": followed_id
+        }) is not None

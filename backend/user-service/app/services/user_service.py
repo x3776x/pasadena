@@ -30,5 +30,32 @@ class UserService:
     def update_profile_picture(self, user_id: int , profile_picture: str):
         return self.repository.update_user_profile(user_id, {"profile_picture": profile_picture})
     
+
+    # === FOLLOW ===
+
+    def follow_user(self, follower_id: int, followed_id: int):
+        if follower_id == followed_id:
+            raise ValueError("You cannot follow yourself")
+
+        # Verificar si ya existe la relación
+        if self.repository.is_following(follower_id, followed_id):
+            raise ValueError("Already following this user")
+
+        return self.repository.follow_user(follower_id, followed_id)
+
+    def unfollow_user(self, follower_id: int, followed_id: int):
+        if not self.repository.is_following(follower_id, followed_id):
+            raise ValueError("You are not following this user")
+
+        return self.repository.unfollow_user(follower_id, followed_id)
+
+    def get_following(self, user_id: int):
+        following = self.repository.get_following(user_id)
+        return following if following else []
+
+    def get_followers(self, user_id: int):
+        followers = self.repository.get_followers(user_id)
+        return followers if followers else []
+
 def get_user_service():
     return UserService()
