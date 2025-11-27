@@ -2,7 +2,7 @@ import pytest
 from fastapi.testclient import TestClient
 from app.database import database
 from app.main import app, get_current_user, get_user_service
-from app.schemas import UserProfileResponse, UserProfileCreate, UserProfileUpdate
+from app.schemas import UserProfileResponse, UserProfileCreate, UserProfileUpdate, FollowResponse
 
 @pytest.fixture(scope="session", autouse=True)
 def setup_indexes():
@@ -98,6 +98,89 @@ class TestUserEndpoints:
         response = client.put("/profiles/1/picture", json=update_data.model_dump())
         assert response.status_code == 200
         assert response.json()["message"] == "Profile picture updated successfully"
+
+
+
+# --- Mock Service para follows ---
+class MockFollowService:
+    def follow_user(self, follower_id, followed_id):
+        if follower_id == followed_id:
+            raise ValueError("You cannot follow yourself")
+        if follower_id == 1 and followed_id == 2:
+            raise ValueError("Already following this user")
+        return "mock_follow_id"
+
+    def unfollow_user(self, follower_id, followed_id):
+        if follower_id == 1 and followed_id == 99:
+            raise ValueError("You are not following this user")
+        return True
+
+    def get_following(self, user_id):
+        if user_id == 1:
+            return [
+                FollowResponse(follower_id=1, followed_id=2, created_at="2025-01-01T00:00:00"),
+                FollowResponse(follower_id=1, followed_id=3, created_at="2025-01-02T00:00:00"),
+            ]
+        return []
+
+    def get_followers(self, user_id):
+        if user_id == 2:
+            return [
+                FollowResponse(follower_id=1, followed_id=2, created_at="2025-01-01T00:00:00")
+            ]
+        return []
+
+
+class TestFollowEndpoints:
+
+    def setup_method(self):
+        # Override solo para pruebas de follows
+        app.dependency_overrides[get_user_service] = lambda: MockFollowService()
+
+    def test_follow_user_success(self, client):
+        app.dependency_overrides[get_current_user] = lambda: create_mock_user(user_id=1)
+        response = client.post("/users/3/follow")
+        assert response.status_code == 200
+        assert response.json()["message"] == "Followed successfully"
+
+    def test_follow_user_self(self, client):
+        app.dependency_overrides[get_current_user] = lambda: create_mock_user(user_id=1)
+        response = client.post("/users/1/follow")
+        assert response.status_code == 400
+        assert "cannot follow yourself" in response.json()["detail"]
+
+    def test_follow_user_already(self, client):
+        app.dependency_overrides[get_current_user] = lambda: create_mock_user(user_id=1)
+        response = client.post("/users/2/follow")
+        assert response.status_code == 400
+        assert "Already following" in response.json()["detail"]
+
+    def test_unfollow_user_success(self, client):
+        app.dependency_overrides[get_current_user] = lambda: create_mock_user(user_id=1)
+        response = client.delete("/users/3/unfollow")
+        assert response.status_code == 200
+        assert response.json()["message"] == "Unfollowed successfully"
+
+    def test_unfollow_user_not_following(self, client):
+        app.dependency_overrides[get_current_user] = lambda: create_mock_user(user_id=1)
+        response = client.delete("/users/99/unfollow")
+        assert response.status_code == 400
+        assert "not following" in response.json()["detail"]
+
+    def test_get_following_success(self, client):
+        response = client.get("/users/1/following")
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+        assert data[0]["followed_id"] == 2
+
+    def test_get_followers_success(self, client):
+        response = client.get("/users/2/followers")
+        assert response.status_code == 200
+        data = response.json()
+        assert isinstance(data, list)
+        assert data[0]["follower_id"] == 1
+
 
 # Cleanup overrides after tests
 @pytest.fixture(autouse=True)
