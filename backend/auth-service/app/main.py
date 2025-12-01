@@ -1,8 +1,9 @@
 from fastapi import FastAPI, Depends, HTTPException, status
 
 from app import schemas
+from app.security import security
 from app.database import get_db
-from app.dependencies.dependencies import get_current_user, oauth2_scheme
+from app.dependencies.dependencies import get_current_user, oauth2_scheme, admin_required
 from app.services.auth_service import AuthService, get_auth_service
 from app.services.password_recovery_service import PasswordRecoveryService, get_password_recovery_service
 
@@ -45,6 +46,23 @@ def login(
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Service Unavailable, please try again later"
+        )
+    
+@app.get("/me", response_model=schemas.FullUserResponse)
+def get_full_user(
+    token: str = Depends(security),
+    current_user = Depends(get_current_user),
+    auth_service: AuthService = Depends(get_auth_service)
+):
+    try:
+        return auth_service.get_all_user_data(
+            current_user.id,
+            token=token.credentials
+            )
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
         )
 
 @app.post("/password-recovery/initiate", response_model=schemas.PasswordRecoveryResponse)
@@ -120,6 +138,7 @@ def list_users(
 @app.get("/users/{user_id}", response_model=schemas.User)
 def get_user(
     user_id: int,
+    current_user = Depends(admin_required),
     auth_service: AuthService = Depends(get_auth_service)
 ):
     try:
@@ -135,6 +154,7 @@ def get_user(
 def update_user(
     user_id: int,
     user_data: schemas.UserUpdate,
+    current_user = Depends(admin_required),
     auth_service: AuthService = Depends(get_auth_service)
 ):
     try:
