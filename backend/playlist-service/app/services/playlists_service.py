@@ -35,9 +35,77 @@ class PlaylistService:
     
     def get_active_playlists(self):
         return playlist_repository.get_active_playlists(self.db)
+    
+    def get_public_playlists(self):
+        return playlist_repository.get_public_playlists(self.db)
+    
+    def get_public_playlists_by_owner(self, owner_id: int):
+        return playlist_repository.get_public_playlists_by_owner(self.db, owner_id)
 
     def get_all_playlists(self):
         return playlist_repository.get_all_playlists(self.db)
+
+    def get_playlist_by_id(self, playlist_id: int):
+        playlist = playlist_repository.get_playlist_by_id(self.db, playlist_id)
+        if not playlist:
+            raise ValueError("Playlist found")
+        return playlist
+
+
+    def get_playlists_by_owner(self, owner_id: int):
+        return playlist_repository.get_playlists_by_owner(self.db, owner_id)
+        
+    
+    def get_playlists_liked_by_user(self, user_id: int):
+        return playlist_repository.get_playlists_liked_by_user(self.db, user_id)
+
+    # === PLAYLIST SONGS ===
+
+    def add_song_to_playlist(self, playlist_id: int, song_id: str, position: int):
+        """
+        Agrega una canción a la playlist.
+        """
+        if position < 1:
+            raise ValueError("Position must be greater than 0")
+        return playlist_repository.add_song_to_playlist(self.db, playlist_id, song_id, position)
+
+    def remove_song_from_playlist(self, playlist_id: int, song_id: str):
+        """
+        Elimina una canción de la playlist.
+        """
+        success = playlist_repository.remove_song_from_playlist(self.db, playlist_id, song_id)
+        if not success:
+            raise ValueError("Song not found in playlist")
+        return success
+
+    def get_songs_in_playlist(self, playlist_id: int):
+        """
+        Obtiene las canciones de una playlist en orden.
+        """
+        return playlist_repository.get_songs_in_playlist(self.db, playlist_id)
+
+    def update_song_position(self, playlist_id: int, song_id: str, new_position: int):
+        """
+        Cambia la posición de una canción dentro de la playlist.
+        """
+        song = playlist_repository.update_song_position(self.db, playlist_id, song_id, new_position)
+        if not song:
+            raise ValueError("Song not found in playlist")
+        return song
+
+    def clear_playlist(self, playlist_id: int):
+        """
+        Elimina todas las canciones de una playlist.
+        """
+        count = playlist_repository.clear_playlist(self.db, playlist_id)
+        return {"deleted": count}
+
+    def is_song_in_playlist(self, playlist_id: int, song_id: str):
+        """
+        Verifica si una canción está en la playlist.
+        """
+        return playlist_repository.is_song_in_playlist(self.db, playlist_id, song_id)
+
 
 
 

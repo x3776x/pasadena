@@ -1,5 +1,4 @@
 from fastapi import FastAPI, Depends, HTTPException, status
-from fastapi.staticfiles import StaticFiles
 
 from app import schemas
 from app.database import get_db
@@ -9,8 +8,6 @@ from app.services.password_recovery_service import PasswordRecoveryService, get_
 
 app = FastAPI(title="Pasadena")
 # --- Authentication helpers ---
-
-app.mount("/static/avatars", StaticFiles(directory="app/static/avatars"), name="static")
 
 # --- API Endpoints ---
 @app.post("/register", response_model=schemas.User)
@@ -22,8 +19,13 @@ def register(
         return auth_service.register_user(user)
     except ValueError as e:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail=str(e)
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Service Unavailable, please try again later"
         )
     
 @app.post("/login", response_model=schemas.Token)
@@ -39,16 +41,11 @@ def login(
             detail=str(e),
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
-@app.get("/users/me", response_model=schemas.User)
-def get_current_user_profile(
-    current_user: schemas.User = Depends(get_current_user)
-):
-    return current_user
-
-@app.get("/profile-pictures")
-def get_available_profile_pictures():
-    return {"available_pictures": [pic.value for pic in schemas.AllowedProfilePics]}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Service Unavailable, please try again later"
+        )
 
 @app.post("/password-recovery/initiate", response_model=schemas.PasswordRecoveryResponse)
 def initiate_password_recovery(
@@ -90,16 +87,65 @@ def reset_password(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
-    
+
+@app.get("/verify-token")
+def verify_token(current_user: schemas.User = Depends(get_current_user)):
+    return current_user
 
 @app.get("/health")
 def health_check():
     return {"status": "ok"}
 
-@app.get("/verify-token")
-def verify_token(current_user: schemas.User = Depends(get_current_user)):
-    """
-    Endpoint para que otros servicios (ej. playlist-service) verifiquen un token.
-    Retorna info del usuario si el token es válido.
-    """
-    return current_user
+
+#user mgmt
+@app.get("/users", response_model=list[schemas.User])
+def list_users(
+    limit: int = 50,
+    offset: int = 0,
+    auth_service: AuthService = Depends(get_auth_service)
+):
+    try:
+        return auth_service.get_all_users(limit=limit, offset=offset)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except ConnectionError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(e)
+        )
+    
+@app.get("/users/{user_id}", response_model=schemas.User)
+def get_user(
+    user_id: int,
+    auth_service: AuthService = Depends(get_auth_service)
+):
+    try:
+        return auth_service.get_user_by_id(user_id)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+
+
+@app.patch("/users/{user_id}", response_model=schemas.User)
+def update_user(
+    user_id: int,
+    user_data: schemas.UserUpdate,
+    auth_service: AuthService = Depends(get_auth_service)
+):
+    try:
+        return auth_service.update_user(user_id, user_data)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+    except ConnectionError as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(e)
+        )

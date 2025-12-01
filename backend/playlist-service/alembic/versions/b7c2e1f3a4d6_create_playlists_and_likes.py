@@ -23,7 +23,7 @@ def upgrade() -> None:
     op.create_table('playlist',
     sa.Column('id', sa.Integer(), nullable=False),
     sa.Column('name', sa.String(length=100), nullable=False),
-    sa.Column('playlist_cover', sa.LargeBinary(), nullable=True),
+    sa.Column('playlist_cover', sa.String(length=100), nullable=True),
     sa.Column('is_public', sa.Boolean(), nullable=True, server_default=sa.text('false')),
     sa.Column('is_active', sa.Boolean(), nullable=True, server_default=sa.text('true')),
     sa.Column('owner_id', sa.Integer(), nullable=False),

@@ -29,3 +29,11 @@ async def get_current_user(
     except JWTError:
         raise credentials_exception
     return user
+
+async def admin_required(current_user=Depends(get_current_user)):
+    if current_user.role_id != 1:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You are not authorized to perform this action"
+        )
+    return current_user

@@ -31,4 +31,4 @@ backend/.env
 *.sublime-project
 venv/
 __pycache__/
-
+local-frontend/
