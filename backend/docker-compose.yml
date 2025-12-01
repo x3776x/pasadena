@@ -1,6 +1,8 @@
 name: pasadena
 
 # backend/docker-compose.yml
+
+
 services:
   postgres_auth_db:
     image: postgres:15-alpine
@@ -25,13 +27,71 @@ services:
 
 
 
+
+  postgres_metadata_db:
+    image: postgres:15-alpine
+    container_name: metadata_postgres
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_METADATA_DB}
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_metadata_data:/var/lib/postgresql/data
+    networks:
+      - pasadena_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h postgres_metadata_db -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  metadata-service:
+    build:
+      context: ./metadata-service
+      dockerfile: Dockerfile
+    container_name: metadata-service
+    depends_on:
+      - mongodb
+      - postgres_metadata_db
+    environment:
+      - MONGO_URI=mongodb://papu:Kavinsky@mongodb:27017/pasadena?authSource=admin
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres_metadata_db:5432/${POSTGRES_METADATA_DB}
+      - MUSIC_DIR=/data/music
+    ports:
+      - "50051:50051"
+    volumes:
+      - ./data/music:/data/music
+    networks:
+      - pasadena_network
+
+
+
+  streaming-service:
+    build: ./streaming-service
+    container_name: streaming-service
+    depends_on:
+      - metadata-service
+    environment:
+      - METADATA_SERVICE_ADDR=metadata-service:50051
+      - MUSIC_DIR=/data/music
+    ports:
+      - "50052:50052"
+    volumes:
+      - ./data/music:/data/music  # Mismo volumen montado
+    networks:
+      - pasadena_network
+
 # auth service
   auth_service:
     build: ./auth-service
     container_name: pasadena_auth_service
     env_file:
       - .env
-    environment: 
+    environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:5432/${POSTGRES_DB}
       - REDIS_URL=redis://redis:6379/0
       - SECRET_KEY=${SECRET_KEY}
@@ -199,10 +259,13 @@ services:
 
 volumes:
   postgres_data:
-  postgres_playlist_data:
   mongo_data:
-  redis_data: 
+  redis_data:
+  music_data:
+  postgres_playlist_data:
+  postgres_metadata_data:
   mongo_user_data:
+
 
 networks:
   pasadena_network:
