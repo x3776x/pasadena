@@ -2,9 +2,13 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"app/app/proto"
 	"app/app/server"
@@ -13,52 +17,51 @@ import (
 )
 
 func main() {
-	// Configuración desde variables de entorno
-	musicDir := os.Getenv("MUSIC_DIR")
-	if musicDir == "" {
-		musicDir = "/data/music"
+	mongoURI := os.Getenv("MONGO_URI")
+	if mongoURI == "" {
+		// ejemplo para correr en docker-compose: mongodb://papu:Kavinsky@pasadena_mongo:27017/?authSource=admin
+		mongoURI = "mongodb://papu:Kavinsky@pasadena_mongo:27017/?authSource=admin"
+	}
+	dbName := os.Getenv("MONGO_DB")
+	if dbName == "" {
+		dbName = "pasadena_db"
+	}
+	bucketName := os.Getenv("GRIDFS_BUCKET")
+	if bucketName == "" {
+		bucketName = "fs"
 	}
 
-	// Crear el servidor de streaming
-	streamingServer := server.NewStreamingServer(musicDir)
+	serv, err := server.NewStreamingServer(mongoURI, dbName, bucketName)
+	if err != nil {
+		log.Fatalf("failed to create streaming server: %v", err)
+	}
 
-	// Crear servidor gRPC
 	grpcServer := grpc.NewServer()
+	proto.RegisterStreamingServiceServer(grpcServer, serv)
 
-	// Registrar el servicio
-	proto.RegisterStreamingServiceServer(grpcServer, streamingServer)
-
-	// Puerto del servicio
-	port := ":50052"
-
-	// Escuchar en el puerto
-	listener, err := net.Listen("tcp", port)
+	lis, err := net.Listen("tcp", ":50052")
 	if err != nil {
-		log.Fatalf("❌ Error al escuchar en el puerto %s: %v", port, err)
+		log.Fatalf("failed to listen: %v", err)
 	}
 
-	log.Printf("🎵 Servicio de streaming iniciado en el puerto %s", port)
-	log.Printf("📁 Directorio de música: %s", musicDir)
+	// graceful shutdown
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
 
-	// Verificar contenido del directorio de música
-	files, err := os.ReadDir(musicDir)
-	if err != nil {
-		log.Printf("⚠️  No se pudo leer el directorio de música: %v", err)
-	} else {
-		log.Printf("📚 Archivos de música disponibles: %d", len(files))
-		for i, file := range files {
-			if i < 10 { // Mostrar solo los primeros 10
-				log.Printf("   - %s", file.Name())
-			}
+	go func() {
+		log.Printf("🎵 streaming service listening on :50052")
+		if err := grpcServer.Serve(lis); err != nil {
+			log.Fatalf("grpc serve error: %v", err)
 		}
-		if len(files) > 10 {
-			log.Printf("   ... y %d más", len(files)-10)
-		}
-	}
+	}()
 
-	// Iniciar el servidor
-	log.Printf("🚀 Iniciando servidor gRPC...")
-	if err := grpcServer.Serve(listener); err != nil {
-		log.Fatalf("❌ Error al iniciar el servidor: %v", err)
+	<-stop
+	log.Printf("🛑 shutting down...")
+
+	grpcServer.GracefulStop()
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := serv.Close(ctx); err != nil {
+		log.Printf("error closing server: %v", err)
 	}
 }

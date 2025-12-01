@@ -1,3 +1,4 @@
+// streaming-service/server/streaming_server.go
 package server
 
 import (
@@ -5,84 +6,143 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"os"
-	"path/filepath"
+	"time"
 
-	"app/proto"
+	"app/app/proto" // ajusta el module path según tu proyecto
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/gridfs"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
-type Server struct {
+type StreamingServer struct {
 	proto.UnimplementedStreamingServiceServer
-	DB *mongo.Database
+	mongoClient *mongo.Client
+	db          *mongo.Database
+	bucket      *gridfs.Bucket
+	bucketName  string
 }
 
-// Constructor
-func NewStreamingServer(db *mongo.Database) *Server {
-	return &Server{DB: db}
+func NewStreamingServer(mongoURI, dbName, bucketName string) (*StreamingServer, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	clientOpts := options.Client().ApplyURI(mongoURI)
+	client, err := mongo.Connect(ctx, clientOpts)
+	if err != nil {
+		return nil, fmt.Errorf("mongo connect: %w", err)
+	}
+
+	if err := client.Ping(ctx, readpref.Primary()); err != nil {
+		return nil, fmt.Errorf("mongo ping: %w", err)
+	}
+
+	db := client.Database(dbName)
+	bktOpts := options.GridFSBucket().SetName(bucketName)
+	bucket, err := gridfs.NewBucket(db, bktOpts)
+	if err != nil {
+		return nil, fmt.Errorf("gridfs.NewBucket: %w", err)
+	}
+
+	return &StreamingServer{
+		mongoClient: client,
+		db:          db,
+		bucket:      bucket,
+		bucketName:  bucketName,
+	}, nil
 }
 
-func (s *Server) StreamSong(req *proto.StreamRequest, stream proto.StreamingService_StreamSongServer) error {
-	if s.DB == nil {
-		return stream.Send(&proto.StreamResponse{
-			Chunk: []byte("MongoDB no conectado"),
-		})
-	}
+// StreamSong: streaming desde GridFS
+func (s *StreamingServer) StreamSong(req *proto.StreamRequest, stream proto.StreamingService_StreamSongServer) error {
+	songID := req.SongId
+	log.Printf("🔄 StreamSong request: %s", songID)
 
-	bucket, err := gridfs.NewBucket(s.DB)
+	// Intentar abrir por filename == songID
+	downloadStream, err := s.bucket.OpenDownloadStreamByName(songID)
 	if err != nil {
-		return err
-	}
+		// Si no existe exactamente por nombre, buscar por prefijo en fs.files
+		log.Printf("⚠️  OpenDownloadStreamByName failed for '%s': %v — buscando por prefijo", songID, err)
+		fileDoc := s.db.Collection(s.bucketName + ".files")
 
-	var fileID interface{}
-	cursor, err := s.DB.Collection("fs.files").Find(context.Background(), bson.M{"filename": req.SongId})
-	if err != nil {
-		return err
-	}
-	defer cursor.Close(context.Background())
+		ctxFind, cancel := context.WithTimeout(stream.Context(), 5*time.Second)
+		defer cancel()
 
-	found := false
-	for cursor.Next(context.Background()) {
-		doc := make(map[string]interface{})
-		if err := cursor.Decode(&doc); err != nil {
-			return err
+		filter := bson.M{"filename": bson.M{"$regex": fmt.Sprintf("^%s", primitive.Regex{Pattern: songID, Options: ""})}}
+		var doc bson.M
+		errFind := fileDoc.FindOne(ctxFind, filter).Decode(&doc)
+		if errFind != nil {
+			log.Printf("❌ no encontrado en fs.files para %s: %v", songID, errFind)
+			return fmt.Errorf("audio not found for songID: %s", songID)
 		}
-		fileID = doc["_id"]
-		found = true
-		break
-	}
 
-	if !found {
-		return stream.Send(&proto.StreamResponse{
-			Chunk: []byte("Archivo no encontrado"),
-		})
-	}
+		// abrir por ObjectID encontrado
+		idVal, ok := doc["_id"]
+		if !ok {
+			return fmt.Errorf("no _id in fs.files doc for %s", songID)
+		}
+		objID, ok := idVal.(primitive.ObjectID)
+		if !ok {
+			// si _id es string intenta convertir
+			switch v := idVal.(type) {
+			case string:
+				oid, e2 := primitive.ObjectIDFromHex(v)
+				if e2 != nil {
+					return fmt.Errorf("invalid file id type for %s", songID)
+				}
+				objID = oid
+			default:
+				return fmt.Errorf("unsupported _id type for file: %T", idVal)
+			}
+		}
 
-	downloadStream, err := bucket.OpenDownloadStream(fileID)
-	if err != nil {
-		return err
+		downloadStream, err = s.bucket.OpenDownloadStream(objID)
+		if err != nil {
+			return fmt.Errorf("OpenDownloadStream by id failed: %w", err)
+		}
 	}
-	defer downloadStream.Close()
+	defer func() {
+		_ = downloadStream.Close()
+	}()
 
-	const chunkSize = 64 * 1024
+	// Streaming por chunks
+	const chunkSize = 64 * 1024 // 64KB (ajustable)
 	buf := make([]byte, chunkSize)
 
+	totalSent := 0
 	for {
-		n, err := downloadStream.Read(buf)
-		if err != nil && err != io.EOF {
-			return err
-		}
-		if n == 0 {
-			break
+		// Si el cliente cancela, salir
+		if stream.Context().Err() != nil {
+			log.Printf("⛔ cliente canceló el stream para %s: %v", songID, stream.Context().Err())
+			return stream.Context().Err()
 		}
 
-		if err := stream.Send(&proto.StreamResponse{Chunk: buf[:n]}); err != nil {
-			return err
+		n, err := downloadStream.Read(buf)
+		if err != nil && err != io.EOF {
+			return fmt.Errorf("error reading gridfs stream: %w", err)
+		}
+		if n > 0 {
+			chunk := buf[:n]
+			resp := &proto.StreamResponse{Chunk: chunk}
+			if err := stream.Send(resp); err != nil {
+				return fmt.Errorf("error sending chunk: %w", err)
+			}
+			totalSent += n
+		}
+		if err == io.EOF {
+			break
 		}
 	}
 
-	log.Println("Streaming completado para song_id:", req.SongId)
+	log.Printf("✅ Stream completed for %s. bytes sent=%d", songID, totalSent)
 	return nil
+}
+
+// Close disconnects mongo client
+func (s *StreamingServer) Close(ctx context.Context) error {
+	if s.mongoClient == nil {
+		return nil
+	}
+	return s.mongoClient.Disconnect(ctx)
 }

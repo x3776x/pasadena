@@ -360,7 +360,8 @@ class MetadataServiceServicer(pb2_grpc.MetadataServiceServicer):
                         id=row["id"],
                         name=row["name"],
                         artist_id=row["artist_id"],
-                        cover=row["cover"] if row["cover"] else b""
+                        cover= b""
+                        #row["cover"] if row["cover"] else
                     ))
 
                 return pb2.SearchAlbumsResponse(albums=albums)
