@@ -90,3 +90,6 @@ class UserUpdate(BaseModel):
     full_name: Optional[str] = None
     username: Optional[str] = None
     role_id: Optional[int] = None
+
+class FullUserResponse(User):
+    profile_picture: str | None
