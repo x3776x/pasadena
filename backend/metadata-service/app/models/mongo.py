@@ -7,14 +7,14 @@ import os
 # -----------------------------------------------------------
 MONGO_URI = os.getenv(
     "MONGO_URI",
-    "mongodb://papu:Kavinsky@mongodb:27017/pasada_db?authSource=admin"
+    "mongodb://papu:Kavinsky@mongodb:27017/pasadena_db?authSource=admin"
 )
 
 # -----------------------------------------------------------
 # Conexión a MongoDB y GridFS
 # -----------------------------------------------------------
 mongo_client = MongoClient(MONGO_URI)
-mongo_db = mongo_client["pasada_db"]
+mongo_db = mongo_client["pasadena_db"]
 fs = gridfs.GridFS(mongo_db)
 
 # -----------------------------------------------------------

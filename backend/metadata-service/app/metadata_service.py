@@ -82,32 +82,49 @@ class MetadataServiceServicer(pb2_grpc.MetadataServiceServicer):
                 #                       ÁLBUM
                 # ============================================================
                 album_table = Album.__table__
-                query_album = album_table.select().where(album_table.c.name == request.album)
+
+                # Buscar álbum con el mismo nombre Y EL MISMO ARTISTA (importante)
+                query_album = album_table.select().where(
+                    sa.and_(
+                        album_table.c.name == request.album,
+                        album_table.c.artist_id == artist_id
+                    )
+                )
+
                 album_data = await postgres_db(query_album)
 
-                # insertar álbum
-                insert_album = (
-                    album_table.insert()
-                    .values(
-                        name=request.album,
-                        release_date=request.year if request.year else None,
-                        cover=request.album_cover,
-                        artist_id=artist_id,
-                    )
-                    .returning(album_table.c.id)
-                )
-                result = await postgres_db(insert_album)
-
-                # normalizamos: si es lista, tomamos el primer elemento y su id
-                if isinstance(result, list):
-                    album_id = result[0]["id"]
-                elif isinstance(result, dict):
-                    album_id = result["id"]
+                if album_data:
+                    # Normalizar resultado
+                    if isinstance(album_data, list):
+                        album_id = album_data[0]["id"]
+                    else:
+                        album_id = album_data["id"]
                 else:
-                    album_id = result  # ya es un entero
+                    # Comprimir portada
+                    compressed_cover = compress_image(request.album_cover)
 
+                    insert_album = (
+                        album_table.insert()
+                        .values(
+                            name=request.album,
+                            release_date=request.year if request.year else None,
+                            cover=compressed_cover,
+                            artist_id=artist_id,
+                        )
+                        .returning(album_table.c.id)
+                    )
 
-    # ============================================================
+                    result = await postgres_db(insert_album)
+
+                    # Normalizar
+                    if isinstance(result, list):
+                        album_id = result[0]["id"]
+                    elif isinstance(result, dict):
+                        album_id = result["id"]
+                    else:
+                        album_id = result
+
+        # ============================================================
                 #                       CANCIÓN
                 # ============================================================
                 song_table = Song.__table__
@@ -406,3 +423,37 @@ class MetadataServiceServicer(pb2_grpc.MetadataServiceServicer):
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details(str(e))
                 return pb2.SearchGenresResponse()
+
+        from PIL import Image
+        import io
+
+def compress_image(image_bytes, max_size_kb=500):
+            """Reduce el tamaño de una imagen sin perder mucha calidad."""
+            if not image_bytes:
+                return image_bytes
+
+            try:
+                img = Image.open(io.BytesIO(image_bytes))
+                img = img.convert("RGB")  # quitar canales raros
+
+                # Redimensionar si es muy grande (opcional pero recomendado)
+                img.thumbnail((800, 800))
+
+                quality = 85
+                buffer = io.BytesIO()
+
+                while True:
+                    buffer.seek(0)
+                    buffer = io.BytesIO()
+                    img.save(buffer, format="JPEG", quality=quality, optimize=True)
+                    size_kb = len(buffer.getvalue()) / 1024
+
+                    if size_kb <= max_size_kb or quality <= 20:
+                        break
+
+                    quality -= 5
+
+                return buffer.getvalue()
+
+            except Exception:
+                return image_bytes  # fallback
