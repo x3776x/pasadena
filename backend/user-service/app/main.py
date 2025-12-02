@@ -2,12 +2,15 @@ from fastapi import FastAPI, Depends, HTTPException, status
 from app.services.user_service import UserService, get_user_service
 from app.core.security import get_current_user
 from app import schemas
+from fastapi.staticfiles import StaticFiles
 
 app = FastAPI(
     title="User service",
     description="for profile pics and future features",
     version="1.0.0"
 )
+
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get("/profiles/{user_id}", response_model=schemas.UserProfileResponse)
 def get_user_profile(
