@@ -272,12 +272,10 @@ volumes:
   postgres_data:
   postgres_playlist_data:
   mongo_data:
-
   redis_data: 
   mongo_user_data:
   music_data:
   postgres_metadata_data:
-  mongo_user_data:
 
 
 networks:
