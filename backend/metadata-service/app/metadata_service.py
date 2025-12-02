@@ -86,16 +86,20 @@ class MetadataServiceServicer(pb2_grpc.MetadataServiceServicer):
                 album_data = await postgres_db(query_album)
 
                 # insertar álbum
+            # Reducir tamaño del cover ANTES de guardar
+                compressed_cover = compress_image(request.album_cover)
+
                 insert_album = (
                     album_table.insert()
                     .values(
                         name=request.album,
                         release_date=request.year if request.year else None,
-                        cover=request.album_cover,
+                        cover=compressed_cover,  # guardamos la versión reducida
                         artist_id=artist_id,
                     )
                     .returning(album_table.c.id)
                 )
+
                 result = await postgres_db(insert_album)
 
                 # normalizamos: si es lista, tomamos el primer elemento y su id
@@ -406,3 +410,37 @@ class MetadataServiceServicer(pb2_grpc.MetadataServiceServicer):
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details(str(e))
                 return pb2.SearchGenresResponse()
+
+        from PIL import Image
+        import io
+
+def compress_image(image_bytes, max_size_kb=500):
+            """Reduce el tamaño de una imagen sin perder mucha calidad."""
+            if not image_bytes:
+                return image_bytes
+
+            try:
+                img = Image.open(io.BytesIO(image_bytes))
+                img = img.convert("RGB")  # quitar canales raros
+
+                # Redimensionar si es muy grande (opcional pero recomendado)
+                img.thumbnail((800, 800))
+
+                quality = 85
+                buffer = io.BytesIO()
+
+                while True:
+                    buffer.seek(0)
+                    buffer = io.BytesIO()
+                    img.save(buffer, format="JPEG", quality=quality, optimize=True)
+                    size_kb = len(buffer.getvalue()) / 1024
+
+                    if size_kb <= max_size_kb or quality <= 20:
+                        break
+
+                    quality -= 5
+
+                return buffer.getvalue()
+
+            except Exception:
+                return image_bytes  # fallback
