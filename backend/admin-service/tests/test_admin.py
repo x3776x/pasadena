@@ -1,7 +1,6 @@
+# admin-service/tests/test_admin.py
 import pytest
 from tests.conftest import FakeResponse
-from app.schemas.user import User
-from app.schemas.update_user import UserUpdate
 
 @pytest.mark.parametrize(
     "client",
@@ -16,11 +15,14 @@ from app.schemas.update_user import UserUpdate
     indirect=True
 )
 def test_list_user_success(client):
-    response = client.get("/admin/users")
+    response = client.get("/admin/users",
+        headers={"Authorization": "Bearer testtoken"}
+    )
     assert response.status_code == 200
     users = response.json()
     assert len(users) == 2
     assert users[0]["email"] == "test1@example.com"
+
 
 @pytest.mark.parametrize(
     "client",
@@ -33,9 +35,12 @@ def test_list_user_success(client):
     indirect=True
 )
 def test_get_user_success(client):
-    response = client.get("/admin/users/1")
-    assert response.status_code == 200
-    assert response.json()["id"] == 1
+    resp = client.get("/admin/users/1",
+        headers={"Authorization": "Bearer testtoken"}
+    )
+    assert resp.status_code == 200
+    assert resp.json()["id"] == 1
+
 
 @pytest.mark.parametrize(
     "client",
@@ -48,9 +53,12 @@ def test_get_user_success(client):
     indirect=True
 )
 def test_ban_user_success(client):
-    response = client.patch("/admin/users/3/ban")
-    assert response.status_code == 200
-    assert response.json()["is_active"] is False
+    resp = client.patch("/admin/users/3/ban",
+        headers={"Authorization": "Bearer testtoken"}
+    )
+    assert resp.status_code == 200
+    assert resp.json()["is_active"] is False
+
 
 @pytest.mark.parametrize(
     "client",
@@ -63,6 +71,8 @@ def test_ban_user_success(client):
     indirect=True
 )
 def test_unban_user_success(client):
-    response = client.patch("/admin/users/3/unban")
-    assert response.status_code == 200
-    assert response.json()["is_active"] is True
+    resp = client.patch("/admin/users/3/unban",
+        headers={"Authorization": "Bearer testtoken"}
+    )
+    assert resp.status_code == 200
+    assert resp.json()["is_active"] is True
