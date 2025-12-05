@@ -1,4 +1,5 @@
 from fastapi import status
+from sqlalchemy import text
 import io
 
 # ============================================
@@ -78,17 +79,27 @@ def test_unlike_playlist(client):
 # cancion_playlist
 # ============================================
 
-def test_add_song_to_playlist(client):
+def test_add_song_to_playlist(client, db_session):
+
+    # Insertar canción en metadata
+    db_session.execute(text("INSERT INTO song (song_id) VALUES ('AAA')"))
+    db_session.commit()
+
     pl = client.post("/playlist", json={"name": "EDM", "is_public": True}).json()
 
     res = client.post(
         f"/playlist/{pl['id']}/songs",
-        json={"song_id": "123", "position": 1},
+        json={"song_id": "AAA", "position": 1},
     )
 
     assert res.status_code == 200
 
-def test_get_songs_in_playlist(client):
+def test_get_songs_in_playlist(client, db_session):
+
+    # Insertar canción en metadata
+    db_session.execute(text("INSERT INTO song (song_id) VALUES ('AAA')"))
+    db_session.commit()
+
     pl = client.post("/playlist", json={"name": "Chill", "is_public": True}).json()
 
     client.post(f"/playlist/{pl['id']}/songs", json={"song_id": "AAA", "position": 1})
@@ -98,14 +109,20 @@ def test_get_songs_in_playlist(client):
     assert res.status_code == 200
     assert len(res.json()) == 1
 
-def test_remove_song_from_playlist(client):
+def test_remove_song_from_playlist(client, db_session):
+    # Insertar canción en metadata
+    db_session.execute(text("INSERT INTO song (song_id) VALUES ('AAA')"))
+    db_session.commit()
+
     pl = client.post("/playlist", json={"name": "Trap", "is_public": True}).json()
 
-    client.post(f"/playlist/{pl['id']}/songs", json={"song_id": "X1", "position": 1})
+    client.post(f"/playlist/{pl['id']}/songs", json={"song_id": "AAA", "position": 1})
 
-    res = client.delete(f"/playlist/{pl['id']}/songs/X1")
+    res = client.delete(f"/playlist/{pl['id']}/songs/AAA")
 
     assert res.status_code == 200
+
+
 
 def test_clear_playlist(client):
     pl = client.post("/playlist", json={"name": "Workout", "is_public": True}).json()

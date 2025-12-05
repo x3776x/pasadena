@@ -1,5 +1,8 @@
 from sqlalchemy.orm import Session
 from app import models, schemas
+from sqlalchemy import exists
+from app.models_metadata import Song
+
 
 
 def get_playlist_by_id(db: Session, playlist_id: int):
@@ -141,6 +144,10 @@ def add_song_to_playlist(db: Session, playlist_id: int, song_id: str, position: 
     db.commit()
     db.refresh(playlist_song)
     return playlist_song
+
+
+def song_exists(song_id: str, db: Session) -> bool:
+    return db.query(exists().where(Song.song_id == song_id)).scalar()
 
 
 def remove_song_from_playlist(db: Session, playlist_id: int, song_id: str) -> bool:

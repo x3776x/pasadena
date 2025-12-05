@@ -6,7 +6,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from app.main import app
-from app.database import get_db, Base
+from app.database import get_db, get_metadata_db, Base, MetadataBase
 from unittest.mock import patch
 from app import models
 from app.security import get_current_user
@@ -26,6 +26,7 @@ TestingSessionLocal = sessionmaker(
 )
 
 Base.metadata.create_all(bind=engine)
+MetadataBase.metadata.create_all(bind=engine)
 
 
 @pytest.fixture
@@ -37,7 +38,17 @@ def override_get_db():
         db.close()
 
 
+@pytest.fixture
+def override_get_metadata_db():
+    db = TestingSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
 app.dependency_overrides[get_db] = override_get_db
+app.dependency_overrides[get_metadata_db] = override_get_metadata_db
 
 
 # ============================================
@@ -48,6 +59,9 @@ def db_session():
     # Borra y recrea las tablas en cada test
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
+    MetadataBase.metadata.drop_all(bind=engine)
+    MetadataBase.metadata.create_all(bind=engine)
+
     session = TestingSessionLocal()
     try:
         yield session
@@ -73,7 +87,15 @@ def client(db_session):
         finally:
             pass
 
+
+    def override_get_metadata_db():
+        try:
+            yield db_session
+        finally:
+            pass
+
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_metadata_db] = override_get_metadata_db
 
     with TestClient(app) as test_client:
         yield test_client

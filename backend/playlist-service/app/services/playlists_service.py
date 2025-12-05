@@ -2,13 +2,14 @@ from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from app import schemas
-from app.database import get_db
+from app.database import get_db, get_metadata_db
 from app.repositories import playlist_repository
 
 
 class PlaylistService:
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, metadata_db: Session):
         self.db = db
+        self.metadata_db = metadata_db
 
     def create_playlist(self, owner_id: int, playlist_data: schemas.PlaylistCreate):
         if not playlist_data.name or len(playlist_data.name) < 1:
@@ -68,6 +69,9 @@ class PlaylistService:
         if position < 1:
             raise ValueError("Position must be greater than 0")
         return playlist_repository.add_song_to_playlist(self.db, playlist_id, song_id, position)
+    
+    def song_exists(self, song_id: str) -> bool:
+        return playlist_repository.song_exists(song_id, self.metadata_db)
 
     def remove_song_from_playlist(self, playlist_id: int, song_id: str):
         """
@@ -109,5 +113,9 @@ class PlaylistService:
 
 
 
-def get_playlist_service(db: Session = Depends(get_db)):
-    return PlaylistService(db)
+def get_playlist_service(
+    db: Session = Depends(get_db),
+    metadata_db: Session = Depends(get_metadata_db)
+):
+    return PlaylistService(db, metadata_db)
+

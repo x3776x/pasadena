@@ -214,6 +214,10 @@ def add_song_to_playlist(
     pl = get_playlist_by_id(playlist_service.db, playlist_id)
     if pl is None or pl.owner_id != current_user["user_id"]:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not allowed")
+
+    if not playlist_service.song_exists(song.song_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Song not found")
+
     try:
         return playlist_service.add_song_to_playlist(playlist_id, song.song_id, song.position)
     except ValueError as e:

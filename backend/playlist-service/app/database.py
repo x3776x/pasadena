@@ -18,3 +18,20 @@ def get_db():
         yield db
     finally:
         db.close()
+
+
+# Metadata DB
+SQLALCHEMY_METADATA_URL = os.getenv(
+    "METADATA_DATABASE_URL",
+    "postgresql://papu:CocteauTwins@postgres_metadata_db:5432/postgres_metadata_db"
+)
+metadata_engine = create_engine(SQLALCHEMY_METADATA_URL)
+MetadataSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=metadata_engine)
+MetadataBase = declarative_base()
+
+def get_metadata_db():
+    db = MetadataSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
