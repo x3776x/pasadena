@@ -3,6 +3,9 @@ import grpc
 from proto import metadata_pb2 as pb2
 from proto import metadata_pb2_grpc as pb2_grpc
 import sqlalchemy as sa
+from PIL import Image
+import io
+import traceback
 
 from models.mongo import save_audio, delete_audio
 from models.song_model import Artist, Album, Song, Genre
@@ -424,8 +427,172 @@ class MetadataServiceServicer(pb2_grpc.MetadataServiceServicer):
                 context.set_details(str(e))
                 return pb2.SearchGenresResponse()
 
-        from PIL import Image
-        import io
+
+        # -------------------------------------------------------------
+        #                     UPDATE SONG
+        # -------------------------------------------------------------
+        # -------------------------------------------------------------
+        #                     UPDATE SONG
+        # -------------------------------------------------------------
+        async def UpdateSong(self, request, context):
+            """Modifica metadatos de una canción, incluyendo artista, álbum, portada y archivo de audio."""
+            try:
+                song_table = Song.__table__
+                artist_table = Artist.__table__
+                album_table = Album.__table__
+                genre_table = Genre.__table__
+
+                # ============================================================
+                #               VALIDAR EXISTENCIA DE LA CANCIÓN
+                # ============================================================
+                query_song = song_table.select().where(song_table.c.song_id == request.song_id)
+                song_data = await postgres_db(query_song)
+
+                if not song_data:
+                    context.set_code(grpc.StatusCode.NOT_FOUND)
+                    context.set_details("Song not found")
+                    return pb2.SongResponse()
+
+                if isinstance(song_data, list):
+                    song_data = song_data[0]
+
+                # IDs actuales
+                current_artist_id = song_data["artist_id"]
+                current_album_id = song_data["album_id"]
+                current_genre_id = song_data["genre_id"]
+
+                final_artist_id = current_artist_id
+                final_album_id = current_album_id
+                final_genre_id = current_genre_id
+
+                # ============================================================
+                #                       ARTISTA
+                # ============================================================
+                if request.artist:
+                    q_artist = artist_table.select().where(artist_table.c.name == request.artist)
+                    artist_data = await postgres_db(q_artist)
+
+                    if artist_data:
+                        final_artist_id = artist_data[0]["id"] if isinstance(artist_data, list) else artist_data["id"]
+                    else:
+                        insert_artist = (
+                            artist_table.insert()
+                            .values(name=request.artist)
+                            .returning(artist_table.c.id)
+                        )
+                        res = await postgres_db(insert_artist)
+                        final_artist_id = res[0]["id"] if isinstance(res, list) else (res["id"] if isinstance(res, dict) else res)
+
+                # ============================================================
+                #                       GÉNERO
+                # ============================================================
+                if request.genre:
+                    q_genre = genre_table.select().where(genre_table.c.name == request.genre)
+                    genre_data = await postgres_db(q_genre)
+
+                    if genre_data:
+                        final_genre_id = genre_data[0]["id"] if isinstance(genre_data, list) else genre_data["id"]
+                    else:
+                        insert_genre = (
+                            genre_table.insert()
+                            .values(name=request.genre)
+                            .returning(genre_table.c.id)
+                        )
+                        res = await postgres_db(insert_genre)
+                        final_genre_id = res[0]["id"] if isinstance(res, list) else (res["id"] if isinstance(res, dict) else res)
+
+                # ============================================================
+                #                       ÁLBUM
+                # ============================================================
+                if request.album:
+                    q_album = album_table.select().where(
+                        sa.and_(
+                            album_table.c.name == request.album,
+                            album_table.c.artist_id == final_artist_id
+                        )
+                    )
+                    album_data = await postgres_db(q_album)
+
+                    if album_data:
+                        final_album_id = album_data[0]["id"] if isinstance(album_data, list) else album_data["id"]
+                    else:
+                        compressed_cover = compress_image(request.album_cover) if request.album_cover else None
+                        insert_album = (
+                            album_table.insert()
+                            .values(
+                                name=request.album,
+                                release_date=request.year if request.year else None,
+                                cover=compressed_cover,
+                                artist_id=final_artist_id
+                            )
+                            .returning(album_table.c.id)
+                        )
+                        res = await postgres_db(insert_album)
+                        final_album_id = res[0]["id"] if isinstance(res, list) else (res["id"] if isinstance(res, dict) else res)
+
+                # ============================================================
+                #                       ACTUALIZAR CANCIÓN
+                # ============================================================
+                update_values = {}
+
+                if request.title is not None:
+                    update_values["title"] = request.title
+                if request.duration is not None:
+                    update_values["duration"] = request.duration
+
+                # IDs actualizados
+                update_values["artist_id"] = final_artist_id
+                update_values["album_id"] = final_album_id
+                update_values["genre_id"] = final_genre_id
+
+                upd_song = song_table.update().values(**update_values).where(song_table.c.song_id == request.song_id)
+                await postgres_db(upd_song)
+
+                # ============================================================
+                #              ACTUALIZAR ÁLBUM (AÑO Y PORTADA)
+                # ============================================================
+                if request.year:
+                    upd_year = album_table.update().values(release_date=request.year).where(album_table.c.id == final_album_id)
+                    await postgres_db(upd_year)
+
+                if request.album_cover:
+                    compressed_cover = compress_image(request.album_cover)
+                    upd_cover = album_table.update().values(cover=compressed_cover).where(album_table.c.id == final_album_id)
+                    await postgres_db(upd_cover)
+
+                # ============================================================
+                #                       ACTUALIZAR AUDIO
+                # ============================================================
+               # if request.file_data:
+                #    delete_audio(request.song_id)
+                   # save_audio(request.song_id, request.file_data)
+
+                # ============================================================
+                #                       RESPUESTA
+                # ============================================================
+                return pb2.SongResponse(
+                    song=pb2.Song(
+                        song_id=request.song_id,
+                        title=request.title or song_data["title"],
+                        artist=request.artist or "",
+                        album=request.album or "",
+                        year=request.year or "",
+                        genre=request.genre or "",
+                        duration=request.duration or song_data["duration"],
+                        album_cover=b"",
+                        artist_id=final_artist_id,
+                        album_id=final_album_id,
+                        genre_id=final_genre_id,
+                    ),
+                    message="Updated"
+                )
+
+            except Exception as e:
+                traceback.print_exc()
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details(str(e))
+                return pb2.SongResponse()
+
 
 def compress_image(image_bytes, max_size_kb=500):
             """Reduce el tamaño de una imagen sin perder mucha calidad."""

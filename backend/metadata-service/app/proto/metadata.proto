@@ -11,6 +11,7 @@ service MetadataService {
   rpc SearchArtists (SearchRequest) returns (SearchArtistsResponse);
   rpc SearchAlbums (SearchRequest) returns (SearchAlbumsResponse);
   rpc SearchGenres (SearchRequest) returns (SearchGenresResponse);
+  rpc UpdateSong (UpdateSongRequest) returns (SongResponse);
 }
 
 message SearchRequest { string query = 1; }
@@ -49,6 +50,19 @@ message SongResponse {
   string message = 2;
 }
 
+message UpdateSongRequest {
+  string song_id = 1;
+
+  // Campos a modificar (opcionales)
+  string title = 2;
+  string artist = 3;
+  string album = 4;
+  string year = 5;
+  string genre = 6;
+  double duration = 7;
+  bytes file_data = 8;     // nuevo audio (opcional)
+  bytes album_cover = 9;   // nueva portada (opcional)
+}
 /* Others */
 message SongPathResponse { string path = 1; }
 message DeleteResponse { bool success = 1; string message = 2; }
