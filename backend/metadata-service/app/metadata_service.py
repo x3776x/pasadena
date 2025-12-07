@@ -23,153 +23,119 @@ class MetadataServiceServicer(pb2_grpc.MetadataServiceServicer):
         async def AddSong(self, request, context):
             try:
                 song_table = Song.__table__
+                artist_table = Artist.__table__
+                album_table = Album.__table__
+                genre_table = Genre.__table__
+
+                # ============================================================
+                #                   GENERAR song_id ÚNICO
+                # ============================================================
                 while True:
                     song_id = str(uuid.uuid4())
-
-                    query_check_song = (
+                    exists = await postgres_db(
                         sa.select(song_table.c.song_id)
                         .where(song_table.c.song_id == song_id)
                     )
-
-                    existing_song = await postgres_db(query_check_song)
-
-                    if not existing_song:
-                        break  # song_id es único, continuar
+                    if not exists:
+                        break
 
                 # ============================================================
-                #                       ARTISTA
+                #                        ARTISTA
                 # ============================================================
-                artist_table = Artist.__table__
-                query_artist = artist_table.select().where(artist_table.c.name == request.artist)
-                artist_data = await postgres_db(query_artist)
+                q_artist = artist_table.select().where(artist_table.c.name == request.artist)
+                artist_data = normalize_one(await postgres_db(q_artist))
 
                 if artist_data:
-                    # Puede ser dict o lista -> normalizamos
-                    if isinstance(artist_data, list):
-                        artist_id = artist_data[0]["id"]
-                    else:
-                        artist_id = artist_data["id"]
+                    artist_id = artist_data["id"]
                 else:
-                    insert_artist = (
+                    res = normalize_one(await postgres_db(
                         artist_table.insert()
                         .values(name=request.artist)
                         .returning(artist_table.c.id)
-                    )
-                    result = await postgres_db(insert_artist)
-                    artist_id = result["id"] if isinstance(result, dict) else result
-
+                    ))
+                    artist_id = res["id"]
 
                 # ============================================================
-                #                       GÉNERO
+                #                        GÉNERO
                 # ============================================================
-                genre_table = Genre.__table__
-                query_genre = genre_table.select().where(genre_table.c.name == request.genre)
-                genre_data = await postgres_db(query_genre)
+                q_genre = genre_table.select().where(genre_table.c.name == request.genre)
+                genre_data = normalize_one(await postgres_db(q_genre))
 
                 if genre_data:
-                    if isinstance(genre_data, list):
-                        genre_id = genre_data[0]["id"]
-                    else:
-                        genre_id = genre_data["id"]
+                    genre_id = genre_data["id"]
                 else:
-                    insert_genre = (
+                    res = normalize_one(await postgres_db(
                         genre_table.insert()
                         .values(name=request.genre)
                         .returning(genre_table.c.id)
-                    )
-                    result = await postgres_db(insert_genre)
-                    genre_id = result["id"] if isinstance(result, dict) else result
-
+                    ))
+                    genre_id = res["id"]
 
                 # ============================================================
-                #                       ÁLBUM
+                #                        ÁLBUM
                 # ============================================================
-                album_table = Album.__table__
-
-                # Buscar álbum con el mismo nombre Y EL MISMO ARTISTA (importante)
-                query_album = album_table.select().where(
+                q_album = album_table.select().where(
                     sa.and_(
                         album_table.c.name == request.album,
                         album_table.c.artist_id == artist_id
                     )
                 )
-
-                album_data = await postgres_db(query_album)
+                album_data = normalize_one(await postgres_db(q_album))
 
                 if album_data:
-                    # Normalizar resultado
-                    if isinstance(album_data, list):
-                        album_id = album_data[0]["id"]
-                    else:
-                        album_id = album_data["id"]
+                    album_id = album_data["id"]
                 else:
-                    # Comprimir portada
                     compressed_cover = compress_image(request.album_cover)
-
-                    insert_album = (
+                    res = normalize_one(await postgres_db(
                         album_table.insert()
                         .values(
                             name=request.album,
                             release_date=request.year if request.year else None,
                             cover=compressed_cover,
-                            artist_id=artist_id,
+                            artist_id=artist_id
                         )
                         .returning(album_table.c.id)
-                    )
+                    ))
+                    album_id = res["id"]
 
-                    result = await postgres_db(insert_album)
-
-                    # Normalizar
-                    if isinstance(result, list):
-                        album_id = result[0]["id"]
-                    elif isinstance(result, dict):
-                        album_id = result["id"]
-                    else:
-                        album_id = result
-
-        # ============================================================
-                #                       CANCIÓN
                 # ============================================================
-                song_table = Song.__table__
-                insert_song = (
-                    song_table.insert()
-                    .values(
+                #                        CANCIÓN
+                # ============================================================
+                await postgres_db(
+                    song_table.insert().values(
                         song_id=song_id,
                         title=request.title,
                         duration=request.duration,
                         album_id=album_id,
                         genre_id=genre_id,
-                        artist_id=artist_id,
+                        artist_id=artist_id
                     )
                 )
-                await postgres_db(insert_song)
-
 
                 # ============================================================
-                #                       AUDIO (MONGO)
+                #               AUDIO - LO MANDAMOS A MONGO
                 # ============================================================
                 save_audio(song_id, request.file_data)
 
-
-                # ============================================================
-                #                       RESPUESTA
-                # ============================================================
-                song_msg = pb2.Song(
-                    song_id=song_id,
-                    title=safe_str(request.title),
-                    artist=safe_str(request.artist),
-                    album=safe_str(request.album),
-                    year=safe_str(request.year),
-                    genre=safe_str(request.genre),
-                    duration=safe_float(request.duration),
-                    album_cover=safe_bytes_from_db(request.album_cover),
-                    artist_id=artist_id,
-                    album_id=album_id,
-                    genre_id=genre_id,
+                return pb2.SongResponse(
+                    message="Created",
+                    song=pb2.Song(
+                        song_id=song_id,
+                        title=request.title,
+                        artist=request.artist,
+                        album=request.album,
+                        genre=request.genre,
+                        year=request.year,
+                        duration=request.duration,
+                        album_cover=request.album_cover,
+                        artist_id=artist_id,
+                        album_id=album_id,
+                        genre_id=genre_id
+                    )
                 )
-                return pb2.SongResponse(song=song_msg, message="Created")
 
             except Exception as e:
+                traceback.print_exc()
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details(str(e))
                 return pb2.SongResponse()
@@ -624,3 +590,21 @@ def compress_image(image_bytes, max_size_kb=500):
 
             except Exception:
                 return image_bytes  # fallback
+
+def normalize_one(raw):
+    if raw is None:
+        return None
+    if isinstance(raw, list):
+        return raw[0] if raw else None
+    if isinstance(raw, dict):
+        return raw
+    return None
+
+def normalize_all(raw):
+    if raw is None:
+        return []
+    if isinstance(raw, list):
+        return raw
+    if isinstance(raw, dict):
+        return [raw]
+    return []

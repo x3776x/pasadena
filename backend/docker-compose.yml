@@ -1,4 +1,4 @@
-name: pasadena
+name: backend
 
 # backend/docker-compose.yml
 services:
