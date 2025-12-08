@@ -80,7 +80,13 @@ class AuthService:
         if not user:
             raise ValueError("User not found")
         return user
-    
+
+    def get_user_by_username(self, username: str) -> schemas.User:
+        user = user_repository.get_user_by_username(self.db, username)
+        if not user:
+            raise ValueError("User not found")
+        return user
+
     def get_all_users(self, limit: int = 100, offset: int = 0):
         users = user_repository.get_all_users(self.db, limit=limit, offset=offset)
         if not users:

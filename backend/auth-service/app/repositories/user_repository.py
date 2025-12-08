@@ -117,4 +117,3 @@ def update_user(db: Session, user_id: int, updates: dict):
     except Exception as e:
         db.rollback()
         raise e
-
