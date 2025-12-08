@@ -559,6 +559,97 @@ class MetadataServiceServicer(pb2_grpc.MetadataServiceServicer):
                 context.set_details(str(e))
                 return pb2.SongResponse()
 
+                # -------------------------------------------------------------
+        #                     GET ALBUM BY ID (FULL)
+        # -------------------------------------------------------------
+        async def GetAlbumById(self, request, context):
+            """Retorna un álbum y todas sus canciones asociadas."""
+            try:
+                album_table = Album.__table__
+                song_table = Song.__table__
+                artist_table = Artist.__table__
+                genre_table = Genre.__table__
+
+                # ============================
+                #   Obtener datos del álbum
+                # ============================
+                q_album = (
+                    sa.select(
+                        album_table.c.id,
+                        album_table.c.name,
+                        album_table.c.release_date,
+                        album_table.c.cover,
+                        artist_table.c.id.label("artist_id"),
+                        artist_table.c.name.label("artist_name")
+                    )
+                    .select_from(album_table.join(artist_table, album_table.c.artist_id == artist_table.c.id))
+                    .where(album_table.c.id == request.id)
+                )
+
+                album_raw = normalize_one(await postgres_db(q_album))
+                if not album_raw:
+                    context.set_code(grpc.StatusCode.NOT_FOUND)
+                    context.set_details("Album not found")
+                    return pb2.GetAlbumByIdResponse()
+
+                # ============================
+                #   Obtener canciones del álbum
+                # ============================
+                q_songs = (
+                    sa.select(
+                        song_table.c.song_id,
+                        song_table.c.title,
+                        song_table.c.duration,
+                        artist_table.c.name.label("artist_name"),
+                        genre_table.c.name.label("genre_name"),
+                        song_table.c.artist_id,
+                        song_table.c.album_id,
+                        song_table.c.genre_id
+                    )
+                    .select_from(
+                        song_table
+                        .join(artist_table, song_table.c.artist_id == artist_table.c.id)
+                        .join(genre_table, song_table.c.genre_id == genre_table.c.id)
+                    )
+                    .where(song_table.c.album_id == request.id)
+                )
+
+                raw_songs = normalize_all(await postgres_db(q_songs))
+
+                songs = []
+                for row in raw_songs:
+                    songs.append(pb2.AlbumSong(
+                        song_id=safe_str(row.get("song_id")),
+                        title=safe_str(row.get("title")),
+                        artist=safe_str(row.get("artist_name")),
+                        genre=safe_str(row.get("genre_name")),
+                        duration=safe_float(row.get("duration")),
+                        artist_id=safe_int(row.get("artist_id")),
+                        genre_id=safe_int(row.get("genre_id"))
+                    ))
+
+                # ============================
+                #        Armar respuesta
+                # ============================
+                album_msg = pb2.AlbumFull(
+                    id=album_raw["id"],
+                    name=album_raw["name"],
+                    artist_id=album_raw["artist_id"],
+                    artist_name=album_raw["artist_name"],
+                    cover=album_raw["cover"] if album_raw["cover"] else b"",
+                    release_date=str(album_raw["release_date"]) if album_raw["release_date"] else "",
+                    songs=songs
+                )
+
+                return pb2.GetAlbumByIdResponse(album=album_msg)
+
+            except Exception as e:
+                traceback.print_exc()
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details(str(e))
+                return pb2.GetAlbumByIdResponse()
+
+
 
 def compress_image(image_bytes, max_size_kb=500):
             """Reduce el tamaño de una imagen sin perder mucha calidad."""
@@ -590,6 +681,8 @@ def compress_image(image_bytes, max_size_kb=500):
 
             except Exception:
                 return image_bytes  # fallback
+
+
 
 def normalize_one(raw):
     if raw is None:

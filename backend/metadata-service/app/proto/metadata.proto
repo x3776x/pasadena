@@ -12,6 +12,7 @@ service MetadataService {
   rpc SearchAlbums (SearchRequest) returns (SearchAlbumsResponse);
   rpc SearchGenres (SearchRequest) returns (SearchGenresResponse);
   rpc UpdateSong (UpdateSongRequest) returns (SongResponse);
+  rpc GetAlbumById(GetAlbumByIdRequest) returns (GetAlbumByIdResponse);
 }
 
 message SearchRequest { string query = 1; }
@@ -77,3 +78,31 @@ message SearchAlbumsResponse { repeated Album albums = 1; }
 
 message Genre { int32 genre_id = 1; string name = 2; }
 message SearchGenresResponse { repeated Genre genres = 1; }
+
+message GetAlbumByIdRequest {
+  int32 id = 1;
+}
+
+message AlbumSong {
+  string song_id = 1;
+  string title = 2;
+  string artist = 3;
+  string genre = 4;
+  double duration = 5;
+  int32 artist_id = 6;
+  int32 genre_id = 7;
+}
+
+message AlbumFull {
+  int32 id = 1;
+  string name = 2;
+  int32 artist_id = 3;
+  bytes cover = 4;
+  string release_date = 5;
+  repeated AlbumSong songs = 6;
+  string artist_name = 7;
+}
+
+message GetAlbumByIdResponse {
+  AlbumFull album = 1;
+}
