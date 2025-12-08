@@ -8,6 +8,7 @@ from app.database import get_db
 from app.repositories import user_repository
 import httpx
 import os
+import requests
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="login")
 USER_SERVICE_URL = os.getenv("USER_SERVICE_URL", "http://user_service:8003/profiles")
@@ -71,7 +72,6 @@ class AuthService:
         except ValueError as e:
             raise e
         except Exception as e:
-            print(f"[LOGIN ERROR] {e}")   # <== Add this temporarily
             raise Exception("Login service unavailable - please try again later")
 
     
@@ -100,6 +100,36 @@ class AuthService:
         if not updated:
             raise ValueError("User not found")
         return updated
+    
+    def get_all_user_data(self, user_id: int, token: str):
+        try:
+            base_user = user_repository.get_user_by_id(self.db, user_id)
+
+            headers = self.forward_auth_header(token)
+
+            profile_resp = requests.get(
+                f"{USER_SERVICE_URL}/{user_id}",
+                headers=headers
+            )
+
+            if profile_resp.status_code != 200:
+                raise Exception(profile_resp.json().get("detail", "Error retrieving profile"))
+
+            profile = profile_resp.json()
+
+            return {
+                **schemas.User.model_validate(base_user).model_dump(),
+                **profile
+            }
+
+        except ValueError as e:
+            raise e
+        except Exception as e:
+            print(f"ERROR in get_all_user_data: {e}")
+            raise Exception("Service unavailable, please try again later")
+        
+    def forward_auth_header(self, token: str):
+        return {"Authorization": f"Bearer {token}"}
 
 def get_auth_service(db: Session = Depends(get_db)):
     return AuthService(db)

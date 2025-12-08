@@ -1,3 +1,4 @@
+# admin-service/tests/conftest.py
 import pytest
 from fastapi.testclient import TestClient
 from app.main import app
@@ -14,16 +15,14 @@ def override_admin_required():
     yield
     app.dependency_overrides = {}
 
-#mock httpclient
-
 class MockHTTPClient:
     def __init__(self, responses):
         self.responses = responses
 
-    async def get(self, path, params=None):
+    async def get(self, path, params=None, headers=None):
         return self.responses.get(("GET", path))
 
-    async def patch(self, path, json=None):
+    async def patch(self, path, json=None, headers=None):
         return self.responses.get(("PATCH", path))
 
 class FakeResponse:
@@ -33,16 +32,15 @@ class FakeResponse:
 
     def json(self):
         return self._data
-    
+
 @pytest.fixture
 def client(request):
     responses = getattr(request, "param", {})
-    
+
     def get_mock_service():
         service = AdminService()
         service.client = MockHTTPClient(responses)
         return service
 
     app.dependency_overrides[get_admin_service] = get_mock_service
-
     return TestClient(app)
