@@ -149,6 +149,19 @@ def get_user(
             detail=str(e)
         )
 
+@app.get("/users/username/{username}", response_model=schemas.User)
+def get_user_username(
+        username: str,
+        auth_service: AuthService = Depends(get_auth_service)
+):
+    try:
+        return auth_service.get_user_by_username(username)
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(e)
+        )
+
 
 @app.patch("/users/{user_id}", response_model=schemas.User)
 def update_user(
