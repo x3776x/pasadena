@@ -111,7 +111,7 @@ def update_profile_picture(
 
 # === FOLLOW ENDPOINTS ===
 
-@app.post("/users/{followed_id}/follow", response_model=dict)
+@app.post("/profiles/{followed_id}/follow", response_model=dict)
 def follow_user(
     followed_id: int,
     current_user = Depends(get_current_user),
@@ -132,7 +132,7 @@ def follow_user(
         )
 
 
-@app.delete("/users/{followed_id}/unfollow", response_model=dict)
+@app.delete("/profiles/{followed_id}/unfollow", response_model=dict)
 def unfollow_user(
     followed_id: int,
     current_user = Depends(get_current_user),
@@ -159,7 +159,7 @@ def unfollow_user(
         )
 
 
-@app.get("/users/{user_id}/following", response_model=list[schemas.FollowResponse])
+@app.get("/profiles/{user_id}/following", response_model=list[schemas.FollowResponse])
 def get_following(
     user_id: int,
     user_service: UserService = Depends(get_user_service)
@@ -173,7 +173,7 @@ def get_following(
         )
 
 
-@app.get("/users/{user_id}/followers", response_model=list[schemas.FollowResponse])
+@app.get("/profiles/{user_id}/followers", response_model=list[schemas.FollowResponse])
 def get_followers(
     user_id: int,
     user_service: UserService = Depends(get_user_service)
