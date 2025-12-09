@@ -1,7 +1,8 @@
-from sqlalchemy import Column, Integer, String, Date, LargeBinary, ForeignKey, Double
+from sqlalchemy import Column, Integer, String, Date, LargeBinary, ForeignKey, Double, Float, DateTime
 from sqlalchemy.orm import relationship
 from database import Base
 from sqlalchemy.ext.declarative import declarative_base
+import datetime
 
 
 
@@ -49,3 +50,18 @@ class Artist(Base):
     __tablename__ = "artist"
     id = Column(Integer, primary_key=True)
     name = Column(String(100), nullable=False, unique=True)
+
+
+class UserStatistics(Base):
+    __tablename__ = "user_statistics"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+
+    user_id = Column(String, nullable=False)
+    song_id = Column(String(100), ForeignKey("song.song_id", ondelete="CASCADE"), nullable=False)
+
+    play_count = Column(Integer, default=1)
+    total_time = Column(Float, default=0)
+    last_play = Column(DateTime, default=datetime.datetime.utcnow)
+
+    # Relación opcional (sirve para joins)

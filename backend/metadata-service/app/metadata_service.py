@@ -1,3 +1,4 @@
+import datetime
 import uuid
 import grpc
 from proto import metadata_pb2 as pb2
@@ -8,7 +9,7 @@ import io
 import traceback
 
 from models.mongo import save_audio, delete_audio
-from models.song_model import Artist, Album, Song, Genre
+from models.song_model import Artist, Album, Song, Genre, UserStatistics
 from utils import execute_db_query as postgres_db, safe_str, safe_float, safe_bytes_from_db, safe_int
 
 def ensure_list(value):
@@ -143,7 +144,7 @@ class MetadataServiceServicer(pb2_grpc.MetadataServiceServicer):
 
 
 
-    # -------------------------------------------------------------
+        # -------------------------------------------------------------
         #                     GET SONG METADATA
         # -------------------------------------------------------------
         async def GetSongMetadata(self, request, context):
@@ -649,6 +650,178 @@ class MetadataServiceServicer(pb2_grpc.MetadataServiceServicer):
                 context.set_details(str(e))
                 return pb2.GetAlbumByIdResponse()
 
+        # -------------------------------------------------------------
+        # REGISTER USER PLAY
+        # -------------------------------------------------------------
+        async def RegisterUserPlay(self, request, context):
+            try:
+                stats_table = UserStatistics.__table__  # tu tabla user_statistics
+                song_table = Song.__table__
+
+                # ============================================================
+                #       VERIFICAR SI YA HAY REGISTRO DEL USUARIO + CANCIÓN
+                # ============================================================
+                q_check = stats_table.select().where(
+                    sa.and_(
+                        stats_table.c.user_id == request.user_id,
+                        stats_table.c.song_id == request.song_id
+                    )
+                )
+                existing = normalize_one(await postgres_db(q_check))
+
+                if existing:
+                    # ========================================================
+                    #      ACTUALIZAR play_count y last_play
+                    # ========================================================
+                    await postgres_db(
+                        stats_table.update()
+                        .where(
+                            sa.and_(
+                                stats_table.c.user_id == request.user_id,
+                                stats_table.c.song_id == request.song_id
+                            )
+                        )
+                        .values(
+                            play_count=stats_table.c.play_count + 1,
+                            last_play=sa.func.now(),
+                            total_time=stats_table.c.total_time + float(request.seconds)  # <-- aquí también
+                        ).returning(stats_table.c.id)
+                    )
+                else:
+                    # ========================================================
+                    #      CREAR NUEVO REGISTRO
+                    # ========================================================
+                    await postgres_db(
+                        stats_table.insert().values(
+                            user_id=request.user_id,
+                            song_id=request.song_id,
+                            play_count=1,
+                            total_time=float(request.seconds),
+                            last_play=sa.func.now()
+                        )
+                    )
+
+
+
+                # ============================================================
+                #      RETORNAR RESPUESTA
+                # ============================================================
+                return pb2.UserPlayResponse(
+                    success = True
+                )
+
+            except Exception as e:
+                traceback.print_exc()
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details(str(e))
+                return pb2.UserPlayResponse()
+
+
+
+    # -------------------------------------------------------------
+        # GET USER STATISTICS
+        # -------------------------------------------------------------
+        async def GetUserStatistics(self, request, context):
+            try:
+                user_id = request.user_id
+                stats_table = UserStatistics.__table__
+                song_table = Song.__table__
+                artist_table = Artist.__table__
+                genre_table = Genre.__table__
+
+                # TOTAL DE CANCIONES REPRODUCIDAS
+                total_songs_query = sa.select(sa.func.sum(stats_table.c.play_count).label("total_songs")).where(
+                    stats_table.c.user_id == user_id
+                )
+                total_songs_res = await postgres_db(total_songs_query)
+                total_songs = total_songs_res[0]["total_songs"] if total_songs_res and total_songs_res[0]["total_songs"] else 0
+
+                # TIEMPO TOTAL ESCUCHADO
+                total_time_query = sa.select(sa.func.sum(stats_table.c.total_time).label("total_time")).where(
+                    stats_table.c.user_id == user_id
+                )
+                total_time_res = await postgres_db(total_time_query)
+                total_time = total_time_res[0]["total_time"] if total_time_res and total_time_res[0]["total_time"] else 0
+
+                # TOP 5 CANCIONES
+                top_songs_query = (
+                    sa.select(
+                        stats_table.c.song_id,
+                        song_table.c.title,
+                        stats_table.c.play_count
+                    )
+                    .select_from(stats_table.join(song_table, stats_table.c.song_id == song_table.c.song_id))
+                    .where(stats_table.c.user_id == user_id)
+                    .order_by(stats_table.c.play_count.desc())
+                    .limit(5)
+                )
+                top_songs_res = await postgres_db(top_songs_query)
+
+                # TOP ARTISTAS
+                top_artists_query = (
+                    sa.select(
+                        artist_table.c.name,
+                        sa.func.sum(stats_table.c.play_count).label("plays")
+                    )
+                    .select_from(
+                        stats_table
+                        .join(song_table, stats_table.c.song_id == song_table.c.song_id)
+                        .join(artist_table, song_table.c.artist_id == artist_table.c.id)
+                    )
+                    .where(stats_table.c.user_id == user_id)
+                    .group_by(artist_table.c.name)
+                    .order_by(sa.desc("plays"))
+                    .limit(5)
+                )
+                top_artists_res = await postgres_db(top_artists_query)
+
+                # TOP GÉNEROS
+                top_genres_query = (
+                    sa.select(
+                        genre_table.c.name,
+                        sa.func.sum(stats_table.c.play_count).label("plays")
+                    )
+                    .select_from(
+                        stats_table
+                        .join(song_table, stats_table.c.song_id == song_table.c.song_id)
+                        .join(genre_table, song_table.c.genre_id == genre_table.c.id)
+                    )
+                    .where(stats_table.c.user_id == user_id)
+                    .group_by(genre_table.c.name)
+                    .order_by(sa.desc("plays"))
+                    .limit(5)
+                )
+                top_genres_res = await postgres_db(top_genres_query)
+
+                # ÚLTIMAS 5 CANCIONES ESCUCHADAS
+                last_played_query = (
+                    sa.select(
+                        stats_table.c.song_id,
+                        song_table.c.title,
+                        stats_table.c.last_play
+                    )
+                    .select_from(stats_table.join(song_table, stats_table.c.song_id == song_table.c.song_id))
+                    .where(stats_table.c.user_id == user_id)
+                    .order_by(stats_table.c.last_play.desc())
+                    .limit(5)
+                )
+                last_played_res = await postgres_db(last_played_query)
+
+                return pb2.UserStatisticsResponse(
+                    totalSongs=int(total_songs),
+                    totalTime=float(total_time),
+                    topSongs=[pb2.TopSong(song_id=row["song_id"], title=row["title"], play_count=row["play_count"]) for row in top_songs_res],
+                    topArtists=[pb2.TopArtist(name=row["name"], play_count=row["plays"]) for row in top_artists_res],
+                    topGenres=[pb2.TopGenre(name=row["name"], play_count=row["plays"]) for row in top_genres_res],
+                    lastPlayed=[pb2.LastPlayed(song_id=row["song_id"], title=row["title"], last_play=str(row["last_play"])) for row in last_played_res]
+                )
+
+            except Exception as e:
+                print("❌ Error GetUserStatistics:", e)
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details(str(e))
+                return pb2.UserStatisticsResponse()
+
 
 
 def compress_image(image_bytes, max_size_kb=500):
@@ -681,6 +854,8 @@ def compress_image(image_bytes, max_size_kb=500):
 
             except Exception:
                 return image_bytes  # fallback
+
+
 
 
 
