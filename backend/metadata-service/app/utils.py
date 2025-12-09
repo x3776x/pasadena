@@ -7,6 +7,7 @@ from database import AsyncSessionFactory
 
 def generate_song_id():
     return str(uuid.uuid4())
+
 async def execute_db_query(query):
     async with AsyncSessionFactory() as session:
         try:

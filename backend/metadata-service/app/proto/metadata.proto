@@ -13,6 +13,9 @@ service MetadataService {
   rpc SearchGenres (SearchRequest) returns (SearchGenresResponse);
   rpc UpdateSong (UpdateSongRequest) returns (SongResponse);
   rpc GetAlbumById(GetAlbumByIdRequest) returns (GetAlbumByIdResponse);
+  rpc RegisterUserPlay(UserPlayRequest) returns (UserPlayResponse);
+  rpc GetUserStatistics(UserStatisticsRequest) returns (UserStatisticsResponse);
+
 }
 
 message SearchRequest { string query = 1; }
@@ -105,4 +108,54 @@ message AlbumFull {
 
 message GetAlbumByIdResponse {
   AlbumFull album = 1;
+}
+
+message UserPlayRequest {
+  string user_id = 1;
+  string song_id = 2;
+  double seconds = 3; // cuanto escuchó
+}
+
+message UserPlayResponse {
+  bool success = 1;
+}
+
+message UserStatisticsRequest {
+  string user_id = 1;
+}
+
+/* TOP CANCIONES */
+message TopSong {
+  string song_id = 1;
+  string title = 2;
+  int32 play_count = 3;
+}
+
+/* TOP ARTISTAS */
+message TopArtist {
+  string name = 1;
+  int32 play_count = 2;
+}
+
+/* TOP GÉNEROS */
+message TopGenre {
+  string name = 1;
+  int32 play_count = 2;
+}
+
+/* ÚLTIMAS ESCUCHADAS */
+message LastPlayed {
+  string song_id = 1;
+  string title = 2;
+  string last_play = 3;
+}
+
+/* RESPUESTA COMPLETA DE ESTADÍSTICAS */
+message UserStatisticsResponse {
+  repeated TopSong topSongs = 1;
+  repeated TopArtist topArtists = 2;
+  repeated TopGenre topGenres = 3;
+  double totalTime = 4;
+  repeated LastPlayed lastPlayed = 5;
+  int32 totalSongs = 6;
 }
