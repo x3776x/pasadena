@@ -15,7 +15,7 @@ service MetadataService {
   rpc GetAlbumById(GetAlbumByIdRequest) returns (GetAlbumByIdResponse);
   rpc RegisterUserPlay(UserPlayRequest) returns (UserPlayResponse);
   rpc GetUserStatistics(UserStatisticsRequest) returns (UserStatisticsResponse);
-
+  rpc GetSongById(GetSongByIdRequest) returns (GetSongByIdResponse);
 }
 
 message SearchRequest { string query = 1; }
@@ -158,4 +158,11 @@ message UserStatisticsResponse {
   double totalTime = 4;
   repeated LastPlayed lastPlayed = 5;
   int32 totalSongs = 6;
+}
+message GetSongByIdRequest {
+  string song_id = 1;
+}
+
+message GetSongByIdResponse {
+  Song song = 1;
 }
