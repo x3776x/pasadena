@@ -11,6 +11,12 @@ def generate_song_id():
 async def execute_db_query(query):
     async with AsyncSessionFactory() as session:
         try:
+            # --- FIX: manejar DELETE o UPDATE ---
+            if not isinstance(query, str) and (query.is_delete or query.is_update):
+                result = await session.execute(query)
+                await session.commit()
+                return {"message": "Comando ejecutado exitosamente."}
+
             if isinstance(query, str):
                 result = await session.execute(text(query))
             else:
