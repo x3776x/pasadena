@@ -136,6 +136,40 @@ def get_playlists_by_owner(
     return playlist_service.get_playlists_by_owner(owner_id)
 
 
+@app.get("/playlist/{owner_id}/active", response_model=list[playlist_schemas.Playlist])
+def get_active_playlists_by_owner(
+    owner_id: int,
+    playlist_service: PlaylistService = Depends(get_playlist_service)
+):
+    """
+    Obtiene todas las playlists activas (is_active = True) de un usuario,
+    sin importar visibilidad (públicas y privadas).
+    """
+    return playlist_service.get_active_playlists_by_owner(owner_id)
+
+
+@app.get("/playlist/{owner_id}/active/public", response_model=list[playlist_schemas.Playlist])
+def get_active_public_playlists_by_owner(
+    owner_id: int,
+    playlist_service: PlaylistService = Depends(get_playlist_service)
+):
+    """
+    Obtiene todas las playlists activas y públicas (is_active = True y public = True)
+    de un usuario.
+    """
+    return playlist_service.get_active_public_playlists_by_owner(owner_id)
+
+
+@app.get("/playlist/active/public", response_model=list[playlist_schemas.Playlist])
+def get_active_public_playlists(
+    playlist_service: PlaylistService = Depends(get_playlist_service)
+):
+    """
+    Obtiene todas las playlists activas y públicas de todos los usuarios.
+    """
+    return playlist_service.get_active_public_playlists()
+
+
 @app.get("/playlist/{user_id}/liked-playlists", response_model=list[playlist_schemas.Playlist])
 def get_playlists_liked_by_user(
     user_id: int,
