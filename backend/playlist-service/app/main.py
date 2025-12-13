@@ -275,6 +275,19 @@ def remove_song_from_playlist(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
 
 
+@app.delete("/playlist/songs/{song_id}")
+def remove_song_references_from_playlists(
+    song_id: str,
+    current_user = Depends(get_current_user),
+    playlist_service: PlaylistService = Depends(get_playlist_service)
+):
+    try:
+        deleted_count = playlist_service.remove_song_references_from_playlists(song_id)
+        return {"message": f"song references removed from {deleted_count} playlists"}
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    
+
 @app.get("/playlist/{playlist_id}/songs", response_model=list[playlist_schemas.PlaylistSong])
 def get_songs_in_playlist(
     playlist_id: int,

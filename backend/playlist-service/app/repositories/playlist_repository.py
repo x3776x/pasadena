@@ -193,6 +193,30 @@ def remove_song_from_playlist(db: Session, playlist_id: int, song_id: str) -> bo
     return True
 
 
+def remove_song_references_from_playlists(db: Session, song_id: str) -> int:
+    """
+    Elimina todas las referencias de una canción en la tabla playlist_song.
+    Retorna el número de registros eliminados.
+    """
+    # Buscar todas las relaciones con esa canción
+    playlist_songs = db.query(models.PlaylistSong).filter(
+        models.PlaylistSong.song_id == song_id
+    ).all()
+
+    if not playlist_songs:
+        return 0
+
+    deleted_count = len(playlist_songs)
+
+    # Eliminar todas las relaciones encontradas
+    for ps in playlist_songs:
+        db.delete(ps)
+
+    db.commit()
+    return deleted_count
+
+
+
 def get_songs_in_playlist(db: Session, playlist_id: int):
     """
     Devuelve todas las canciones de una playlist, ordenadas por posición.

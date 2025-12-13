@@ -90,6 +90,13 @@ class PlaylistService:
         if not success:
             raise ValueError("Song not found in playlist")
         return success
+    
+    def remove_song_references_from_playlists(self, song_id: str):
+        """
+        Elimina todas las referencias de una canción en todas las playlists.
+        """
+        count = playlist_repository.remove_song_references_from_playlists(self.db, song_id)
+        return count
 
     def get_songs_in_playlist(self, playlist_id: int):
         """
