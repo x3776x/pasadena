@@ -55,3 +55,6 @@ class FollowResponse(FollowBase):
                 "created_at": "2023-01-01T12:00:00"
             }
         }
+
+class IsFollowingResponse(BaseModel):
+    is_following: bool

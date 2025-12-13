@@ -57,5 +57,8 @@ class UserService:
         followers = self.repository.get_followers(user_id)
         return followers if followers else []
 
+    def is_following(self, follower_id: int, followed_id: int) -> bool:
+        return self.repository.is_following(follower_id, followed_id)
+
 def get_user_service():
     return UserService()

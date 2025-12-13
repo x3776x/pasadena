@@ -186,6 +186,23 @@ def get_followers(
             detail=f"Database error: {str(e)}"
         )
 
+@app.get(
+    "/profiles/{follower_id}/follows/{followed_id}",
+    response_model=schemas.IsFollowingResponse
+)
+def is_following(
+        follower_id: int,
+        followed_id: int,
+        user_service: UserService = Depends(get_user_service)
+):
+    try:
+        result = user_service.is_following(follower_id, followed_id)
+        return {"is_following": result}
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Database error: {str(e)}"
+        )
 
     
 @app.get("/health")
