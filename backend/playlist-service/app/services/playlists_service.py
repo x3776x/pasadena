@@ -59,6 +59,15 @@ class PlaylistService:
     
     def get_playlists_liked_by_user(self, user_id: int):
         return playlist_repository.get_playlists_liked_by_user(self.db, user_id)
+    
+    def get_active_playlists_by_owner(self, owner_id: int):
+        return playlist_repository.get_active_playlists_by_owner(self.db, owner_id)
+    
+    def get_active_public_playlists_by_owner(self, owner_id: int):
+        return playlist_repository.get_active_public_playlists_by_owner(self.db, owner_id)
+    
+    def get_active_public_playlists(self):
+        return playlist_repository.get_active_public_playlists(self.db)
 
     # === PLAYLIST SONGS ===
 

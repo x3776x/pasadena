@@ -716,6 +716,77 @@ class MetadataServiceServicer(pb2_grpc.MetadataServiceServicer):
                 context.set_details(str(e))
                 return pb2.UserPlayResponse()
 
+        async def GetSongById(self, request, context):
+            try:
+                song_id = request.song_id
+
+                song_table = Song.__table__
+                artist_table = Artist.__table__
+                album_table = Album.__table__
+                genre_table = Genre.__table__
+
+                query = (
+                    sa.select(
+                        song_table.c.song_id,
+                        song_table.c.title,
+                        song_table.c.duration,
+                        song_table.c.album_id,
+                        song_table.c.genre_id,
+                        song_table.c.artist_id,
+                        artist_table.c.name.label("artist_name"),
+                        album_table.c.name.label("album_name"),
+                        genre_table.c.name.label("genre_name")
+                    )
+                    .select_from(
+                        song_table
+                        .outerjoin(artist_table, song_table.c.artist_id == artist_table.c.id)
+                        .outerjoin(album_table, song_table.c.album_id == album_table.c.id)
+                        .outerjoin(genre_table, song_table.c.genre_id == genre_table.c.id)
+                    )
+                    .where(song_table.c.song_id == song_id)
+                )
+
+                raw = await postgres_db(query)
+
+                # Normalización para evitar errores
+                if raw is None:
+                    rows = []
+                elif isinstance(raw, list):
+                    rows = raw
+                elif isinstance(raw, dict):
+                    rows = [raw]
+                else:
+                    rows = []
+
+                if not rows:
+                    context.set_code(grpc.StatusCode.NOT_FOUND)
+                    context.set_details("Song not found")
+                    return pb2.GetSongByIdResponse(song=None)
+
+                row = rows[0]
+
+                song = pb2.Song(
+                    song_id=safe_str(row.get("song_id")),
+                    title=safe_str(row.get("title")),
+                    artist=safe_str(row.get("artist_name")),
+                    album=safe_str(row.get("album_name")),
+                    genre=safe_str(row.get("genre_name")),
+                    duration=safe_float(row.get("duration")),
+                    album_cover=b"",
+                    artist_id=safe_int(row.get("artist_id")),
+                    album_id=safe_int(row.get("album_id")),
+                    genre_id=safe_int(row.get("genre_id"))
+                )
+
+                return pb2.GetSongByIdResponse(song=song)
+
+            except Exception as e:
+                print("ERROR IN GetSongById:", e)
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details(str(e))
+                return pb2.GetSongByIdResponse(song=None)
+
+
 
 
     # -------------------------------------------------------------

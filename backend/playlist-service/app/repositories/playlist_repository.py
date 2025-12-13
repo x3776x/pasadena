@@ -72,6 +72,33 @@ def get_public_playlists_by_owner(db: Session, owner_id: int):
         .all()
     )
 
+def get_active_playlists_by_owner(db: Session, owner_id: int):
+    return (
+        db.query(models.Playlist)
+        .filter(
+            models.Playlist.owner_id == owner_id,
+            models.Playlist.is_active == True
+        )
+        .all()
+    )
+
+def get_active_public_playlists_by_owner(db: Session, owner_id: int):
+    return (
+        db.query(models.Playlist)
+        .filter(
+            models.Playlist.owner_id == owner_id,
+            models.Playlist.is_active == True,
+            models.Playlist.is_public == True
+        )
+        .all()
+    )
+
+def get_active_public_playlists(db: Session):
+    return db.query(models.Playlist).filter(
+        models.Playlist.is_active == True,
+        models.Playlist.is_public == True
+    ).all()
+
 
 def get_all_playlists(db: Session):
     return db.query(models.Playlist).all()
