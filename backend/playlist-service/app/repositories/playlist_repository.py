@@ -99,6 +99,13 @@ def get_active_public_playlists(db: Session):
         models.Playlist.is_public == True
     ).all()
 
+def get_active_public_playlists_by_name(db: Session, name: str):
+    return db.query(models.Playlist).filter(
+        models.Playlist.is_active == True,
+        models.Playlist.is_public == True,
+        models.Playlist.name.ilike(f"%{name}%")
+    ).all()
+
 
 def get_all_playlists(db: Session):
     return db.query(models.Playlist).all()

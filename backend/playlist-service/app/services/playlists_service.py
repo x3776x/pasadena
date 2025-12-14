@@ -68,6 +68,9 @@ class PlaylistService:
     
     def get_active_public_playlists(self):
         return playlist_repository.get_active_public_playlists(self.db)
+    
+    def get_active_public_playlists_by_name(self, name: str):
+        return playlist_repository.get_active_public_playlists_by_name(self.db, name)
 
     # === PLAYLIST SONGS ===
 
