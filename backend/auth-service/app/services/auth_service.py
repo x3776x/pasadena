@@ -60,6 +60,9 @@ class AuthService:
 
             if not user or not security.verify_password(password, user.hashed_password):
                 raise ValueError("Incorrect credentials")
+            
+            if not user.is_active:
+                raise ValueError("Your account is banned.")
 
             access_token_expires = timedelta(minutes=security.ACCESS_TOKEN_EXPIRE_MINUTES)
             access_token = security.create_access_token(
