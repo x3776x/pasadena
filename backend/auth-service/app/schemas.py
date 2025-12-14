@@ -5,26 +5,22 @@ from typing import Optional
 
 # Base schema for shared attributes
 class UserBase(BaseModel):
-    email: EmailStr
-    full_name: str
-    username: str
+    email: EmailStr = Field(max_length=50)
+    full_name: str = Field(min_length=8, max_length=50)
+    username: str = Field(min_length=8, max_length=50)
     is_active: bool = True
     role_id: int = 2
 
 class UserLogin(BaseModel):
-    identifier: str
-    password: str = Field(min_length=8)
+    identifier: str = Field(min_length=8, max_length=50)
+    password: str = Field(min_length=8, max_length=30)
 
 # Schema for creating a user (registration). Includes password.
 class UserCreate(UserBase):
-    password: str = Field(min_length=8)
+    password: str = Field(min_length=8, max_length=30)
 
     @field_validator('username')
     def validate_username(cls, v):
-        if len(v) < 3:
-            raise ValueError('Username must be at least 3 characters')
-        if len(v) > 50:
-            raise ValueError('Username must be less than 50 characters')
         if not re.match(r'^[a-zA-Z0-9_]+$', v):
             raise ValueError('Username can only contain letters, numbers and underscores')
         return v
@@ -67,18 +63,18 @@ class TokenData(BaseModel):
 
 # Schema for user to modify its password
 class PasswordRecoveryRequest(BaseModel):
-    email: EmailStr
-    username: str
+    email: EmailStr = Field(min_length=8, max_length=50)
+    username: str = Field(min_length=8, max_length=50)
 
 class PasswordRecoveryVerify(BaseModel):
-    email: EmailStr
+    email: EmailStr = Field(min_length=8, max_length=50)
     code: str = Field(min_length=4, max_length=4, description="4-digit code")
 
 class PasswordReset(BaseModel):
-    email: EmailStr
+    email: EmailStr = Field(max_length=50)
     code: str = Field(min_length=4, max_length=4)
-    new_password: str = Field(min_length=8)
-    confirm_password: str
+    new_password: str = Field(min_length=8, max_length=30)
+    confirm_password: str = Field(min_length=8, max_length=30)
 
 class PasswordRecoveryResponse(BaseModel):
     message: str
