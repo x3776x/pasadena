@@ -4,18 +4,18 @@ from datetime import datetime
 
 # Playlist schemas
 class PlaylistBase(BaseModel):
-    name: str
+    name: str = Field(max_length=100)
     is_public: bool = False
 
 
 class PlaylistCreate(PlaylistBase):
-    name: str
+    name: str = Field(max_length=100)
     is_public: bool
     playlist_cover: str | None = None
 
 
 class PlaylistUpdate(BaseModel):
-    name: str | None = None
+    name: str | None = Field(default=None, max_length=100)
     is_public: bool | None = None
     playlist_cover: str | None = None
 
