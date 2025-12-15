@@ -83,9 +83,9 @@ class PasswordRecoveryResponse(BaseModel):
 #update user fields
 class UserUpdate(BaseModel):
     is_active: Optional[bool] = None
-    full_name: Optional[str] = None
-    username: Optional[str] = None
-    role_id: Optional[int] = None
+    full_name: Optional[str] = Field(default=None, min_length=2, max_length=50)
+    username: Optional[str] = Field(default=None, min_length=4, max_length=50)
+    role_id: Optional[int] = Field(min_length=1)
 
 class FullUserResponse(User):
     profile_picture: str | None
