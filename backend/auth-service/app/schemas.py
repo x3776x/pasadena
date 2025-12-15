@@ -7,12 +7,12 @@ from typing import Optional
 class UserBase(BaseModel):
     email: EmailStr = Field(max_length=50)
     full_name: str = Field(min_length=4, max_length=50)
-    username: str = Field(min_length=8, max_length=50)
+    username: str = Field(min_length=3, max_length=50)
     is_active: bool = True
     role_id: int = 2
 
 class UserLogin(BaseModel):
-    identifier: str = Field(min_length=4, max_length=50)
+    identifier: str = Field(min_length=3, max_length=50)
     password: str = Field(min_length=8, max_length=30)
 
 # Schema for creating a user (registration). Includes password.
