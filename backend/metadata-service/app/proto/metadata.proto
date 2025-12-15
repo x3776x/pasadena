@@ -1,0 +1,168 @@
+syntax = "proto3";
+package metadata;
+
+service MetadataService {
+  rpc AddSong (AddSongRequest) returns (SongResponse);
+  rpc GetSongMetadata (SongRequest) returns (SongResponse);
+  rpc GetSongPath (SongRequest) returns (SongPathResponse);
+  rpc DeleteSong (SongRequest) returns (DeleteResponse);
+
+  rpc SearchSongs (SearchRequest) returns (SearchSongsResponse);
+  rpc SearchArtists (SearchRequest) returns (SearchArtistsResponse);
+  rpc SearchAlbums (SearchRequest) returns (SearchAlbumsResponse);
+  rpc SearchGenres (SearchRequest) returns (SearchGenresResponse);
+  rpc UpdateSong (UpdateSongRequest) returns (SongResponse);
+  rpc GetAlbumById(GetAlbumByIdRequest) returns (GetAlbumByIdResponse);
+  rpc RegisterUserPlay(UserPlayRequest) returns (UserPlayResponse);
+  rpc GetUserStatistics(UserStatisticsRequest) returns (UserStatisticsResponse);
+  rpc GetSongById(GetSongByIdRequest) returns (GetSongByIdResponse);
+}
+
+message SearchRequest { string query = 1; }
+
+message AddSongRequest {
+  bytes file_data = 1;
+  string title = 2;
+  string artist = 3;
+  string album = 4;
+  string year = 5;
+  string genre = 6;
+  double duration = 7;
+  bytes album_cover = 8;
+}
+
+message SongRequest { string song_id = 1; }
+
+/* Single song payload */
+message Song {
+  string song_id = 1;
+  string title = 2;
+  string artist = 3;         // human name
+  string album = 4;          // human name
+  string year = 5;
+  string genre = 6;          // human name
+  double duration = 7;
+  bytes album_cover = 8;
+  int32 artist_id = 9;       // numeric DB id (optional)
+  int32 album_id = 10;
+  int32 genre_id = 11;
+}
+
+/* Generic wrapper for single-song RPCs */
+message SongResponse {
+  Song song = 1;
+  string message = 2;
+}
+
+message UpdateSongRequest {
+  string song_id = 1;
+
+  // Campos a modificar (opcionales)
+  string title = 2;
+  string artist = 3;
+  string album = 4;
+  string year = 5;
+  string genre = 6;
+  double duration = 7;
+  bytes file_data = 8;     // nuevo audio (opcional)
+  bytes album_cover = 9;   // nueva portada (opcional)
+}
+/* Others */
+message SongPathResponse { string path = 1; }
+message DeleteResponse { bool success = 1; string message = 2; }
+
+message SearchSongsResponse { repeated Song songs = 1; }
+
+message Artist { int32 artist_id = 1; string name = 2; }
+message SearchArtistsResponse { repeated Artist artists = 1; }
+
+message Album { int32 id = 1; string name = 2; int32 artist_id = 3; bytes cover = 4; }
+message SearchAlbumsResponse { repeated Album albums = 1; }
+
+message Genre { int32 genre_id = 1; string name = 2; }
+message SearchGenresResponse { repeated Genre genres = 1; }
+
+message GetAlbumByIdRequest {
+  int32 id = 1;
+}
+
+message AlbumSong {
+  string song_id = 1;
+  string title = 2;
+  string artist = 3;
+  string genre = 4;
+  double duration = 5;
+  int32 artist_id = 6;
+  int32 genre_id = 7;
+}
+
+message AlbumFull {
+  int32 id = 1;
+  string name = 2;
+  int32 artist_id = 3;
+  bytes cover = 4;
+  string release_date = 5;
+  repeated AlbumSong songs = 6;
+  string artist_name = 7;
+}
+
+message GetAlbumByIdResponse {
+  AlbumFull album = 1;
+}
+
+message UserPlayRequest {
+  string user_id = 1;
+  string song_id = 2;
+  double seconds = 3; // cuanto escuchó
+}
+
+message UserPlayResponse {
+  bool success = 1;
+}
+
+message UserStatisticsRequest {
+  string user_id = 1;
+}
+
+/* TOP CANCIONES */
+message TopSong {
+  string song_id = 1;
+  string title = 2;
+  int32 play_count = 3;
+}
+
+/* TOP ARTISTAS */
+message TopArtist {
+  string name = 1;
+  int32 play_count = 2;
+}
+
+/* TOP GÉNEROS */
+message TopGenre {
+  string name = 1;
+  int32 play_count = 2;
+}
+
+/* ÚLTIMAS ESCUCHADAS */
+message LastPlayed {
+  string song_id = 1;
+  string title = 2;
+  string last_play = 3;
+}
+
+/* RESPUESTA COMPLETA DE ESTADÍSTICAS */
+message UserStatisticsResponse {
+  repeated TopSong topSongs = 1;
+  repeated TopArtist topArtists = 2;
+  repeated TopGenre topGenres = 3;
+  double totalTime = 4;
+  repeated LastPlayed lastPlayed = 5;
+  int32 totalSongs = 6;
+}
+message GetSongByIdRequest {
+  string song_id = 1;
+}
+
+message GetSongByIdResponse {
+  Song song = 1;
+}

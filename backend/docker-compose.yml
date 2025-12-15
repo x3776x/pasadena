@@ -1,8 +1,10 @@
+name: backend
+
 # backend/docker-compose.yml
 services:
-  postgres_db:
+  postgres_auth_db:
     image: postgres:15-alpine
-    container_name: pasadena_postgres
+    container_name: auth_postgres
     env_file:
       - .env
     environment:
@@ -36,6 +38,64 @@ services:
     networks:
       - pasadena_network
 
+
+  postgres_metadata_db:
+    image: postgres:15-alpine
+    container_name: metadata_postgres
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_METADATA_DB}
+    ports:
+      - "5434:5432"
+    volumes:
+      - postgres_metadata_data:/var/lib/postgresql/data
+    networks:
+      - pasadena_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h postgres_metadata_db -U ${POSTGRES_USER}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  metadata-service:
+    build:
+      context: ./metadata-service
+      dockerfile: Dockerfile
+    container_name: metadata-service
+    depends_on:
+      - mongodb
+      - postgres_metadata_db
+    environment:
+      - MONGO_URI=mongodb://papu:Kavinsky@mongodb:27017/pasadena?authSource=admin
+      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres_metadata_db:5432/${POSTGRES_METADATA_DB}
+      - MUSIC_DIR=/data/music
+    ports:
+      - "50051:50051"
+    volumes:
+      - ./data/music:/data/music
+    networks:
+      - pasadena_network
+
+
+
+  streaming-service:
+    build: ./streaming-service
+    container_name: streaming-service
+    depends_on:
+      - metadata-service
+    environment:
+      - METADATA_SERVICE_ADDR=metadata-service:50051
+      - MUSIC_DIR=/data/music
+    ports:
+      - "50052:50052"
+    volumes:
+      - ./data/music:/data/music  # Mismo volumen montado
+    networks:
+      - pasadena_network
+
 # auth service
   auth_service:
     build: ./auth-service
@@ -48,12 +108,23 @@ services:
       - SECRET_KEY=${SECRET_KEY}
       - MAIL_ADDRESS=${MAIL_ADDRESS}
       - MAIL_PASS=${MAIL_PASS}
+      - USER_SERVICE_URL=${USER_SERVICE_URL}
     ports:
       - "8001:8001"
-    command: ["/bin/sh", "/app/entrypoint.sh"]
+    command: >
+      sh -c "
+        until pg_isready -h postgres_auth_db -U ${POSTGRES_USER} -d ${POSTGRES_DB}; do
+          echo 'Esperando a PostgreSQL...';
+          sleep 2;
+        done;
+        echo 'Base de datos lista. Ejecutando migraciones...';
+        alembic upgrade head;
+        echo 'Migraciones completadas. Iniciando servidor...';
+        uvicorn app.main:app --host 0.0.0.0 --port 8001"
     depends_on:
-      - postgres_db
+      - postgres_auth_db
       - redis
+      - user_service
     networks:
       - pasadena_network
     healthcheck:
@@ -73,6 +144,47 @@ services:
     networks:
       - pasadena_network
 
+# user MongoDB
+  mongo_user_db:
+    image: mongo:6-jammy
+    container_name: user_mongo
+    env_file:
+      - .env
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=${MONGO_INITDB_ROOT_USERNAME}
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGO_INITDB_ROOT_PASSWORD}
+      - MONGO_INITDB_DATABASE=${MONGO_USER_DB}
+    ports:
+      - "27018:27017"
+    volumes:
+      - mongo_user_data:/data/db
+    networks:
+      - pasadena_network
+    healthcheck:
+      test: mongosh --username ${MONGO_INITDB_ROOT_USERNAME} --password ${MONGO_INITDB_ROOT_PASSWORD} --eval "db.adminCommand('ping')"
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+# user service
+  user_service:
+    build: ./user-service
+    container_name: pasadena_user_service
+    env_file:
+      - .env
+    environment:
+      - DATABASE_URL=mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongo_user_db:27017/${MONGO_USER_DB}?authSource=admin
+    ports:
+      - "8003:8003"
+    command: "uvicorn app.main:app --host 0.0.0.0 --port 8003"
+    depends_on:
+      mongo_user_db:
+        condition: service_healthy
+    networks:
+      - pasadena_network
+
+# Playlist Postgres DB
   postgres_playlist_db:
     image: postgres:15-alpine
     container_name: playlist_postgres
@@ -98,6 +210,8 @@ services:
   playlist_service:
     build: ./playlist-service
     container_name: pasadena_playlist_service
+    env_file:
+      - .env
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres_playlist_db:5432/${POSTGRES_PLAYLIST_DB}
     ports:
@@ -116,12 +230,53 @@ services:
       - postgres_playlist_db
     networks:
       - pasadena_network
+    volumes:
+      - ./playlist-service/app/static:/app/static
+
+# admin postgres db
+  admin_service:
+    build: ./admin-service
+    container_name: pasadena_admin_service
+    env_file:
+      - .env
+    environment:
+      - AUTH_SERVICE_URL=${AUTH_SERVICE_URL}
+    ports:
+      - "8004:8004"
+    depends_on:
+      - auth_service
+    networks:
+      - pasadena_network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8004/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+
+# API Gateway
+  api_gateway:
+    build: ./gateway
+    container_name: pasadena_gateway
+    ports:
+      - "8080:80"
+    depends_on:
+      - auth_service
+      - playlist_service
+      - user_service
+      - admin_service
+    networks:
+      - pasadena_network
 
 volumes:
   postgres_data:
   postgres_playlist_data:
   mongo_data:
   redis_data: 
+  mongo_user_data:
+  music_data:
+  postgres_metadata_data:
+
 
 networks:
   pasadena_network:

@@ -2,13 +2,14 @@ from fastapi import Depends
 from sqlalchemy.orm import Session
 
 from app import schemas
-from app.database import get_db
+from app.database import get_db, get_metadata_db
 from app.repositories import playlist_repository
 
 
 class PlaylistService:
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, metadata_db: Session):
         self.db = db
+        self.metadata_db = metadata_db
 
     def create_playlist(self, owner_id: int, playlist_data: schemas.PlaylistCreate):
         if not playlist_data.name or len(playlist_data.name) < 1:
@@ -35,11 +36,105 @@ class PlaylistService:
     
     def get_active_playlists(self):
         return playlist_repository.get_active_playlists(self.db)
+    
+    def get_public_playlists(self):
+        return playlist_repository.get_public_playlists(self.db)
+    
+    def get_public_playlists_by_owner(self, owner_id: int):
+        return playlist_repository.get_public_playlists_by_owner(self.db, owner_id)
 
     def get_all_playlists(self):
         return playlist_repository.get_all_playlists(self.db)
 
+    def get_playlist_by_id(self, playlist_id: int):
+        playlist = playlist_repository.get_playlist_by_id(self.db, playlist_id)
+        if not playlist:
+            raise ValueError("Playlist found")
+        return playlist
 
 
-def get_playlist_service(db: Session = Depends(get_db)):
-    return PlaylistService(db)
+    def get_playlists_by_owner(self, owner_id: int):
+        return playlist_repository.get_playlists_by_owner(self.db, owner_id)
+        
+    
+    def get_playlists_liked_by_user(self, user_id: int):
+        return playlist_repository.get_playlists_liked_by_user(self.db, user_id)
+    
+    def get_active_playlists_by_owner(self, owner_id: int):
+        return playlist_repository.get_active_playlists_by_owner(self.db, owner_id)
+    
+    def get_active_public_playlists_by_owner(self, owner_id: int):
+        return playlist_repository.get_active_public_playlists_by_owner(self.db, owner_id)
+    
+    def get_active_public_playlists(self):
+        return playlist_repository.get_active_public_playlists(self.db)
+    
+    def get_active_public_playlists_by_name(self, name: str):
+        return playlist_repository.get_active_public_playlists_by_name(self.db, name)
+
+    # === PLAYLIST SONGS ===
+
+    def add_song_to_playlist(self, playlist_id: int, song_id: str, position: int):
+        """
+        Agrega una canción a la playlist.
+        """
+        if position < 1:
+            raise ValueError("Position must be greater than 0")
+        return playlist_repository.add_song_to_playlist(self.db, playlist_id, song_id, position)
+    
+    def song_exists(self, song_id: str) -> bool:
+        return playlist_repository.song_exists(song_id, self.metadata_db)
+
+    def remove_song_from_playlist(self, playlist_id: int, song_id: str):
+        """
+        Elimina una canción de la playlist.
+        """
+        success = playlist_repository.remove_song_from_playlist(self.db, playlist_id, song_id)
+        if not success:
+            raise ValueError("Song not found in playlist")
+        return success
+    
+    def remove_song_references_from_playlists(self, song_id: str):
+        """
+        Elimina todas las referencias de una canción en todas las playlists.
+        """
+        count = playlist_repository.remove_song_references_from_playlists(self.db, song_id)
+        return count
+
+    def get_songs_in_playlist(self, playlist_id: int):
+        """
+        Obtiene las canciones de una playlist en orden.
+        """
+        return playlist_repository.get_songs_in_playlist(self.db, playlist_id)
+
+    def update_song_position(self, playlist_id: int, song_id: str, new_position: int):
+        """
+        Cambia la posición de una canción dentro de la playlist.
+        """
+        song = playlist_repository.update_song_position(self.db, playlist_id, song_id, new_position)
+        if not song:
+            raise ValueError("Song not found in playlist")
+        return song
+
+    def clear_playlist(self, playlist_id: int):
+        """
+        Elimina todas las canciones de una playlist.
+        """
+        count = playlist_repository.clear_playlist(self.db, playlist_id)
+        return {"deleted": count}
+
+    def is_song_in_playlist(self, playlist_id: int, song_id: str):
+        """
+        Verifica si una canción está en la playlist.
+        """
+        return playlist_repository.is_song_in_playlist(self.db, playlist_id, song_id)
+
+
+
+
+def get_playlist_service(
+    db: Session = Depends(get_db),
+    metadata_db: Session = Depends(get_metadata_db)
+):
+    return PlaylistService(db, metadata_db)
+

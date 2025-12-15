@@ -18,7 +18,7 @@ coverage/
 Thumbs.db
 
 # Environment files
-.env
+backend/.env
 .env.*
 
 # VSCode
@@ -31,4 +31,4 @@ Thumbs.db
 *.sublime-project
 venv/
 __pycache__/
-
+local-frontend/

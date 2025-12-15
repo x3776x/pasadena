@@ -1,0 +1,13 @@
+grpcio
+grpcio-tools
+pymongo
+mutagen
+alembic
+python-dotenv
+psycopg2-binary
+sqlalchemy
+databases
+SQLAlchemy>=2.0
+asyncpg
+uvicorn
+pillow

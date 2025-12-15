@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+package streaming;
+option go_package = "app/proto";
+
+service StreamingService {
+  rpc StreamSong (StreamRequest) returns (stream StreamResponse);
+}
+
+message StreamRequest {
+  string song_id = 1; // ID de la canción (el mismo que devuelve metadata-service)
+}
+
+message StreamResponse {
+  bytes chunk = 1;    // Fragmento del archivo de audio
+}

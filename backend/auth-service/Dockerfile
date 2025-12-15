@@ -20,9 +20,6 @@ COPY ./alembic ./alembic
 # Expose the port the app runs on
 EXPOSE 8001
 
-COPY entrypoint.sh /app/entrypoint.sh
-RUN chmod +x /app/entrypoint.sh
-
 # Define the command to run the application
 # We will override this with 'command:' in docker-compose to run the migration first
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8001"]
