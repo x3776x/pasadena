@@ -166,7 +166,7 @@ def get_user_username(
 @app.patch("/users/{user_id}", response_model=schemas.User)
 def update_user(
     user_id: int,
-    user_data: schemas.UserUpdate,
+    user_data: schemas.AdminUserStatusUpdate,
     current_user = Depends(admin_required),
     auth_service: AuthService = Depends(get_auth_service)
 ):

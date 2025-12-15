@@ -89,3 +89,7 @@ class UserUpdate(BaseModel):
 
 class FullUserResponse(User):
     profile_picture: str | None
+
+#update user status
+class AdminUserStatusUpdate(BaseModel):
+    is_active: bool
