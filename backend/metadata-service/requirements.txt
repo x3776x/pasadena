@@ -11,3 +11,6 @@ SQLAlchemy>=2.0
 asyncpg
 uvicorn
 pillow
+pytest
+pytest-asyncio
+grpcio-testing

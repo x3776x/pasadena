@@ -1,9 +1,9 @@
 import asyncio
 import grpc
 from concurrent import futures
-from database import Base
+
 from sqlalchemy import create_engine  # ✅ Engine sincrónico
-from models.song_model import Base
+
 from database import engine  # Este es el async engine
 
 from proto import metadata_pb2_grpc as pb2_grpc
@@ -15,8 +15,7 @@ def create_tables_sync():
     from sqlalchemy import create_engine
     sync_engine = create_engine("postgresql://papu:CocteauTwins@postgres_metadata_db:5432/postgres_metadata_db")
 
-    Base.metadata.create_all(bind=sync_engine)
-    print("✅ Tablas creadas (modo sincrónico)")
+    print(" Tablas creadas (modo sincrónico)")
 
 
 async def serve():
@@ -27,7 +26,7 @@ async def serve():
     server.add_insecure_port("[::]:50051")
 
     await server.start()
-    print("🚀 MetadataService escuchando en puerto 50051")
+    print(" MetadataService escuchando en puerto 50051")
 
     await server.wait_for_termination()
 

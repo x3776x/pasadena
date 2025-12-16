@@ -90,3 +90,55 @@ def resize_image(image_bytes: bytes, max_size: int = 300) -> bytes:
         output = io.BytesIO()
         img.save(output, format="JPEG")  # o PNG según tu necesidad
         return output.getvalue()
+
+
+
+def normalize_one(raw):
+    if raw is None:
+        return None
+    if isinstance(raw, list):
+        return raw[0] if raw else None
+    if isinstance(raw, dict):
+        return raw
+    return None
+
+def normalize_all(raw):
+    if raw is None:
+        return []
+    if isinstance(raw, list):
+        return raw
+    if isinstance(raw, dict):
+        return [raw]
+    return []
+
+
+def compress_image(image_bytes, max_size_kb=500):
+    """Reduce el tamaño de una imagen sin perder mucha calidad."""
+    if not image_bytes:
+        return image_bytes
+
+    try:
+        img = Image.open(io.BytesIO(image_bytes))
+        img = img.convert("RGB")  # quitar canales raros
+
+        # Redimensionar si es muy grande (opcional pero recomendado)
+        img.thumbnail((800, 800))
+
+        quality = 85
+        buffer = io.BytesIO()
+
+        while True:
+            buffer.seek(0)
+            buffer = io.BytesIO()
+            img.save(buffer, format="JPEG", quality=quality, optimize=True)
+            size_kb = len(buffer.getvalue()) / 1024
+
+            if size_kb <= max_size_kb or quality <= 20:
+                break
+
+            quality -= 5
+
+        return buffer.getvalue()
+
+    except Exception:
+        return image_bytes  # fallback
