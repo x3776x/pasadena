@@ -3,11 +3,12 @@ from sqlalchemy.orm import relationship
 from database import Base
 from sqlalchemy.ext.declarative import declarative_base
 import datetime
-
+from sqlalchemy import Column, Integer, String
 
 
 class Genre(Base):
     __tablename__ = "genre"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True)
     name = Column(String(50), unique=True, nullable=False)
@@ -17,6 +18,7 @@ class Genre(Base):
 
 class Album(Base):
     __tablename__ = "album"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True)
     name = Column(String(100), nullable=False)
@@ -28,6 +30,7 @@ class Album(Base):
 
 class Song(Base):
     __tablename__ = "song"
+    __table_args__ = {'extend_existing': True}
 
     song_id = Column(String(100), primary_key=True)
     title = Column(String(100), nullable=False)
@@ -43,17 +46,17 @@ class Song(Base):
 
 
 
-from sqlalchemy import Column, Integer, String
-from database import Base
-
 class Artist(Base):
     __tablename__ = "artist"
+    __table_args__ = {'extend_existing': True}
+
     id = Column(Integer, primary_key=True)
     name = Column(String(100), nullable=False, unique=True)
 
 
 class UserStatistics(Base):
     __tablename__ = "user_statistics"
+    __table_args__ = {'extend_existing': True}
 
     id = Column(Integer, primary_key=True, autoincrement=True)
 

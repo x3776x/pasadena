@@ -11,7 +11,7 @@ RUN pip install --no-cache-dir -r requirements.txt grpcio-tools
 
 # Copiar todo el código (incluye proto, models, services, etc.)
 COPY ./app ./app
-
+COPY ./tests .
 # Entrar a la carpeta app
 WORKDIR /app/app
 
