@@ -316,7 +316,7 @@ class MetadataServiceServicer(pb2_grpc.MetadataServiceServicer):
 
                 genres = [
                     pb2.Genre(
-                        id=row["id"],
+                        genre_id=row["id"],
                         name=row["name"]
                     )
                     for row in rows
