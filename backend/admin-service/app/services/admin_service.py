@@ -47,6 +47,9 @@ class AdminService:
 
         if response.status_code == 404:
             raise HTTPException(status_code=404, detail="User not found")
+        
+        if response.status_code == 422:
+            raise HTTPException(status_code=422, detail=response.json())
 
         if response.status_code != 200:
             raise HTTPException(status_code=503, detail="Auth service unavailable")

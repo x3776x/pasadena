@@ -1,26 +1,16 @@
-import datetime
 import uuid
 import grpc
 from proto import metadata_pb2 as pb2
 from proto import metadata_pb2_grpc as pb2_grpc
 import sqlalchemy as sa
-from PIL import Image
-import io
 import traceback
-
+from utils import normalize_all, normalize_one, compress_image
 from models.mongo import save_audio, delete_audio
 from models.song_model import Artist, Album, Song, Genre, UserStatistics
 from utils import execute_db_query as postgres_db, safe_str, safe_float, safe_bytes_from_db, safe_int
 
-def ensure_list(value):
-    return value if isinstance(value, list) else []
-
 class MetadataServiceServicer(pb2_grpc.MetadataServiceServicer):
 
-
-        # -------------------------------------------------------------
-        #                       ADD SONG
-        # -------------------------------------------------------------
         async def AddSong(self, request, context):
             try:
                 song_table = Song.__table__
@@ -28,9 +18,6 @@ class MetadataServiceServicer(pb2_grpc.MetadataServiceServicer):
                 album_table = Album.__table__
                 genre_table = Genre.__table__
 
-                # ============================================================
-                #                   GENERAR song_id ÚNICO
-                # ============================================================
                 while True:
                     song_id = str(uuid.uuid4())
                     exists = await postgres_db(
@@ -40,9 +27,6 @@ class MetadataServiceServicer(pb2_grpc.MetadataServiceServicer):
                     if not exists:
                         break
 
-                # ============================================================
-                #                        ARTISTA
-                # ============================================================
                 q_artist = artist_table.select().where(artist_table.c.name == request.artist)
                 artist_data = normalize_one(await postgres_db(q_artist))
 
@@ -141,46 +125,6 @@ class MetadataServiceServicer(pb2_grpc.MetadataServiceServicer):
                 context.set_details(str(e))
                 return pb2.SongResponse()
 
-
-
-
-        # -------------------------------------------------------------
-        #                     GET SONG METADATA
-        # -------------------------------------------------------------
-        async def GetSongMetadata(self, request, context):
-            """Obtiene los metadatos de una canción."""
-            try:
-                song_table = Song.__table__
-                query = song_table.select().where(song_table.c.song_id == request.song_id)
-                song = await postgres_db(query)
-
-                if not song:
-                    context.set_code(grpc.StatusCode.NOT_FOUND)
-                    context.set_details("Song not found")
-                    return pb2.SongResponse()
-
-                return pb2.SongResponse(
-                    song_id=song["song_id"],
-                    title=song["title"],
-                    duration=song["duration"],
-                    album=str(song["album_id"]),
-                    genre=str(song["genre_id"]),
-                    artist=str(song["artist_id"]),
-                    album_cover=b""
-                )
-
-            except Exception as e:
-                context.set_code(grpc.StatusCode.INTERNAL)
-                context.set_details(str(e))
-                return pb2.SongResponse()
-
-        # -------------------------------------------------------------
-        #                     GET SONG PATH
-        # -------------------------------------------------------------
-        async def GetSongPath(self, request, context):
-            """Retorna una ruta virtual o ID (Mongo)."""
-            return pb2.SongPathResponse(path=f"/songs/{request.song_id}")
-
         # -------------------------------------------------------------
         #                     DELETE SONG
         # -------------------------------------------------------------
@@ -200,10 +144,6 @@ class MetadataServiceServicer(pb2_grpc.MetadataServiceServicer):
                 context.set_details(str(e))
                 return pb2.DeleteResponse(success=False, message=str(e))
 
-
-        # -------------------------------------------------------------
-        #                     SEARCH SONGS
-        # -------------------------------------------------------------
         # -------------------------------------------------------------
         #                     SEARCH SONGS
         # -------------------------------------------------------------
@@ -241,7 +181,6 @@ class MetadataServiceServicer(pb2_grpc.MetadataServiceServicer):
                         (genre_table.c.name.ilike(q))
                     )
                 )
-
                 raw = await postgres_db(query)
 
                 # normalizar
@@ -277,9 +216,7 @@ class MetadataServiceServicer(pb2_grpc.MetadataServiceServicer):
                 context.set_details(str(e))
                 return pb2.SearchSongsResponse()
 
-
-
-    # -------------------------------------------------------------
+        # -------------------------------------------------------------
         #                     SEARCH ARTISTS
         # -------------------------------------------------------------
         async def SearchArtists(self, request, context):
@@ -313,7 +250,6 @@ class MetadataServiceServicer(pb2_grpc.MetadataServiceServicer):
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details(str(e))
                 return pb2.SearchArtistsResponse()
-
 
         # -------------------------------------------------------------
         #                     SEARCH ALBUMS
@@ -358,7 +294,6 @@ class MetadataServiceServicer(pb2_grpc.MetadataServiceServicer):
                 context.set_details(str(e))
                 return pb2.SearchAlbumsResponse()
 
-
         # -------------------------------------------------------------
         #                     SEARCH GENRES
         # -------------------------------------------------------------
@@ -381,7 +316,7 @@ class MetadataServiceServicer(pb2_grpc.MetadataServiceServicer):
 
                 genres = [
                     pb2.Genre(
-                        id=row["id"],
+                        genre_id=row["id"],
                         name=row["name"]
                     )
                     for row in rows
@@ -394,15 +329,10 @@ class MetadataServiceServicer(pb2_grpc.MetadataServiceServicer):
                 context.set_details(str(e))
                 return pb2.SearchGenresResponse()
 
-
-        # -------------------------------------------------------------
-        #                     UPDATE SONG
-        # -------------------------------------------------------------
         # -------------------------------------------------------------
         #                     UPDATE SONG
         # -------------------------------------------------------------
         async def UpdateSong(self, request, context):
-            """Modifica metadatos de una canción, incluyendo artista, álbum, portada y archivo de audio."""
             try:
                 song_table = Song.__table__
                 artist_table = Artist.__table__
@@ -528,13 +458,6 @@ class MetadataServiceServicer(pb2_grpc.MetadataServiceServicer):
                     await postgres_db(upd_cover)
 
                 # ============================================================
-                #                       ACTUALIZAR AUDIO
-                # ============================================================
-               # if request.file_data:
-                #    delete_audio(request.song_id)
-                   # save_audio(request.song_id, request.file_data)
-
-                # ============================================================
                 #                       RESPUESTA
                 # ============================================================
                 return pb2.SongResponse(
@@ -560,7 +483,7 @@ class MetadataServiceServicer(pb2_grpc.MetadataServiceServicer):
                 context.set_details(str(e))
                 return pb2.SongResponse()
 
-                # -------------------------------------------------------------
+        # -------------------------------------------------------------
         #                     GET ALBUM BY ID (FULL)
         # -------------------------------------------------------------
         async def GetAlbumById(self, request, context):
@@ -700,9 +623,6 @@ class MetadataServiceServicer(pb2_grpc.MetadataServiceServicer):
                             last_play=sa.func.now()
                         )
                     )
-
-
-
                 # ============================================================
                 #      RETORNAR RESPUESTA
                 # ============================================================
@@ -719,7 +639,6 @@ class MetadataServiceServicer(pb2_grpc.MetadataServiceServicer):
         async def GetSongById(self, request, context):
             try:
                 song_id = request.song_id
-
                 song_table = Song.__table__
                 artist_table = Artist.__table__
                 album_table = Album.__table__
@@ -786,10 +705,7 @@ class MetadataServiceServicer(pb2_grpc.MetadataServiceServicer):
                 context.set_details(str(e))
                 return pb2.GetSongByIdResponse(song=None)
 
-
-
-
-    # -------------------------------------------------------------
+        # -------------------------------------------------------------
         # GET USER STATISTICS
         # -------------------------------------------------------------
         async def GetUserStatistics(self, request, context):
@@ -888,62 +804,117 @@ class MetadataServiceServicer(pb2_grpc.MetadataServiceServicer):
                 )
 
             except Exception as e:
-                print("❌ Error GetUserStatistics:", e)
+                print(" Error GetUserStatistics:", e)
                 context.set_code(grpc.StatusCode.INTERNAL)
                 context.set_details(str(e))
                 return pb2.UserStatisticsResponse()
-
-
-
-def compress_image(image_bytes, max_size_kb=500):
-            """Reduce el tamaño de una imagen sin perder mucha calidad."""
-            if not image_bytes:
-                return image_bytes
-
+        # -------------------------------------------------------------
+        #              GET LATEST ALBUMS (HOME)
+        # -------------------------------------------------------------
+        async def GetLatestAlbums(self, request, context):
             try:
-                img = Image.open(io.BytesIO(image_bytes))
-                img = img.convert("RGB")  # quitar canales raros
+                album_table = Album.__table__
+                artist_table = Artist.__table__
 
-                # Redimensionar si es muy grande (opcional pero recomendado)
-                img.thumbnail((800, 800))
+                # ============================
+                #   Normalizar límite
+                # ============================
+                requested_limit = request.limit
+                limit = requested_limit if requested_limit and requested_limit > 0 else 10
 
-                quality = 85
-                buffer = io.BytesIO()
+                query = (
+                    sa.select(
+                        album_table.c.id,
+                        album_table.c.name,
+                        album_table.c.cover,
+                        album_table.c.artist_id
+                    )
+                    .order_by(album_table.c.id.desc())
+                    .limit(limit)
+                )
 
-                while True:
-                    buffer.seek(0)
-                    buffer = io.BytesIO()
-                    img.save(buffer, format="JPEG", quality=quality, optimize=True)
-                    size_kb = len(buffer.getvalue()) / 1024
+                raw = await postgres_db(query)
+                rows = normalize_all(raw)
 
-                    if size_kb <= max_size_kb or quality <= 20:
-                        break
+                albums = [
+                    pb2.Album(
+                        id=safe_int(row.get("id")),
+                        name=safe_str(row.get("name")),
+                        artist_id=safe_int(row.get("artist_id")),
+                        cover=row.get("cover") if row.get("cover") else b""
+                    )
+                    for row in rows
+                ]
+                return pb2.LatestAlbumsResponse(albums=albums)
 
-                    quality -= 5
+            except Exception as e:
+                traceback.print_exc()
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details(str(e))
+                return pb2.LatestAlbumsResponse()
 
-                return buffer.getvalue()
+        # -------------------------------------------------------------
+        #              GET LATEST SONGS (HOME) – SIN MODIFICAR BD
+        # -------------------------------------------------------------
+        async def GetLatestSongs(self, request, context):
+            try:
+                song_table = Song.__table__
+                artist_table = Artist.__table__
+                album_table = Album.__table__
+                genre_table = Genre.__table__
 
-            except Exception:
-                return image_bytes  # fallback
+                limit = request.limit if request.limit and request.limit > 0 else 5
 
+                query = (
+                    sa.select(
+                        song_table.c.song_id,
+                        song_table.c.title,
+                        song_table.c.duration,
+                        song_table.c.artist_id,
+                        song_table.c.album_id,
+                        song_table.c.genre_id,
+                        artist_table.c.name.label("artist_name"),
+                        album_table.c.name.label("album_name"),
+                        genre_table.c.name.label("genre_name")
+                    )
+                    .select_from(
+                        song_table
+                        .outerjoin(artist_table, song_table.c.artist_id == artist_table.c.id)
+                        .outerjoin(album_table, song_table.c.album_id == album_table.c.id)
+                        .outerjoin(genre_table, song_table.c.genre_id == genre_table.c.id)
+                    )
+                    # 👇 truco clave SIN created_at
+                    .order_by(
+                        album_table.c.id.desc().nullslast(),
+                        song_table.c.song_id.desc()
+                    )
+                    .limit(limit)
+                )
 
+                raw = await postgres_db(query)
+                rows = normalize_all(raw)
 
+                songs = [
+                    pb2.Song(
+                        song_id=safe_str(row.get("song_id")),
+                        title=safe_str(row.get("title")),
+                        artist=safe_str(row.get("artist_name")),
+                        album=safe_str(row.get("album_name")),
+                        genre=safe_str(row.get("genre_name")),
+                        duration=safe_float(row.get("duration")),
+                        album_cover=b"",
+                        artist_id=safe_int(row.get("artist_id")),
+                        album_id=safe_int(row.get("album_id")),
+                        genre_id=safe_int(row.get("genre_id"))
+                    )
+                    for row in rows
+                ]
 
+                return pb2.LatestSongsResponse(songs=songs)
 
-def normalize_one(raw):
-    if raw is None:
-        return None
-    if isinstance(raw, list):
-        return raw[0] if raw else None
-    if isinstance(raw, dict):
-        return raw
-    return None
+            except Exception as e:
+                traceback.print_exc()
+                context.set_code(grpc.StatusCode.INTERNAL)
+                context.set_details(str(e))
+                return pb2.LatestSongsResponse()
 
-def normalize_all(raw):
-    if raw is None:
-        return []
-    if isinstance(raw, list):
-        return raw
-    if isinstance(raw, dict):
-        return [raw]
-    return []
